@@ -26,6 +26,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.room.Room
 import com.example.lol.data.AppDatabase
 import com.example.lol.data.SubjectRepository
+import com.example.lol.repository.TimetableRepository
+import com.example.lol.viewmodel.TimetableViewModel
+import com.example.lol.viewmodel.TimetableViewModelFactory
 import androidx.compose.runtime.remember
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -47,9 +50,14 @@ class MainActivity : ComponentActivity() {
                     .build()
                 }
                 val repository = remember { SubjectRepository(db.subjectDao()) }
+                val timetableRepository = remember { TimetableRepository(db.timetableDao()) }
+                val timetableViewModel: TimetableViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+                    factory = TimetableViewModelFactory(timetableRepository)
+                )
                 val items = listOf(
                     BottomNavItem.Home,
-                    BottomNavItem.Subjects
+                    BottomNavItem.Subjects,
+                    BottomNavItem.Timetable
                 )
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
@@ -78,7 +86,8 @@ class MainActivity : ComponentActivity() {
                     AppNavHost(
                         navController = navController,
                         repository = repository,
-                        modifier = Modifier.padding(innerPadding) 
+                        timetableViewModel = timetableViewModel,
+                        modifier = Modifier.padding(innerPadding)
                     )
                 }
             }

@@ -5,10 +5,11 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [Subject::class, Attendance::class], version = 2, exportSchema = false)
+@Database(entities = [Subject::class, Attendance::class, TimetableEntry::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun subjectDao(): SubjectDao
     abstract fun attendanceDao(): AttendanceDao
+    abstract fun timetableDao(): TimetableDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
