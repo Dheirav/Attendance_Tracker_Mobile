@@ -41,8 +41,10 @@ class MainActivity : ComponentActivity() {
                     Room.databaseBuilder(
                         context.applicationContext,
                         AppDatabase::class.java,
-                        "attendance-db"
-                    ).build()
+                        "attendance_db"
+                    )
+                    .fallbackToDestructiveMigration()
+                    .build()
                 }
                 val repository = remember { SubjectRepository(db.subjectDao()) }
                 val items = listOf(
@@ -75,7 +77,8 @@ class MainActivity : ComponentActivity() {
                 ) { innerPadding ->
                     AppNavHost(
                         navController = navController,
-                        repository = repository
+                        repository = repository,
+                        modifier = Modifier.padding(innerPadding) 
                     )
                 }
             }
