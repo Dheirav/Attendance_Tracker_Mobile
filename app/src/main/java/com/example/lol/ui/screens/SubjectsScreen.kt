@@ -21,7 +21,6 @@ import com.example.lol.viewmodel.SubjectViewModel
 import com.example.lol.viewmodel.SubjectViewModelFactory
 import com.example.lol.viewmodel.AttendanceViewModel
 import com.example.lol.viewmodel.AttendanceViewModelFactory
-import com.example.lol.repository.AttendanceRepository
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -29,16 +28,18 @@ import java.time.format.DateTimeFormatter
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubjectsScreen(
-    repository: SubjectRepository
+    repository: SubjectRepository,
+    attendanceViewModel: AttendanceViewModel
 ) {
     val context = LocalContext.current
     val db = remember { AppDatabase.getInstance(context) }
-    val attendanceRepository = remember { AttendanceRepository(db.attendanceDao()) }
-    val attendanceViewModel: AttendanceViewModel = viewModel(factory = AttendanceViewModelFactory(attendanceRepository))
     val viewModel: SubjectViewModel = viewModel(factory = SubjectViewModelFactory(repository))
     val subjects by viewModel.subjects.collectAsState()
     var showDialog by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
     var editingSubject by remember { mutableStateOf<Subject?>(null) }
+    var attendedClasses by remember { mutableStateOf(0) }
+    var totalClasses by remember { mutableStateOf(0) }
     val snackbarHostState = remember { SnackbarHostState() }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
@@ -59,16 +60,16 @@ fun SubjectsScreen(
                     IconButton(onClick = { /* Handle back navigation */ }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
+                },
+                actions = {
+                    IconButton(onClick = {
+                        editingSubject = null
+                        showDialog = true
+                    }) {
+                        Icon(Icons.Default.Add, contentDescription = "Add Subject")
+                    }
                 }
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = {
-                editingSubject = null
-                showDialog = true
-            }) {
-                Icon(Icons.Default.Add, contentDescription = "Add Subject")
-            }
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { innerPadding ->
@@ -89,7 +90,13 @@ fun SubjectsScreen(
                                 editingSubject = subject
                                 showDialog = true
                             },
-                            onDeleteSuccess = { msg -> errorMessage = msg }
+                            onDeleteSuccess = { msg -> errorMessage = msg },
+                            onEditAttendance = {
+                                editingSubject = subject
+                                attendedClasses = subject.attendedClasses
+                                totalClasses = subject.totalClasses
+                                showEditDialog = true
+                            }
                         )
                     }
                 }
@@ -134,6 +141,49 @@ fun SubjectsScreen(
                     onDismiss = { showDialog = false }
                 )
             }
+
+            if (showEditDialog && editingSubject != null) {
+                AlertDialog(
+                    onDismissRequest = { showEditDialog = false },
+                    title = { Text("Edit Attendance for ${editingSubject!!.name}") },
+                    text = {
+                        Column {
+                            OutlinedTextField(
+                                value = attendedClasses.toString(),
+                                onValueChange = { attendedClasses = it.toIntOrNull() ?: 0 },
+                                label = { Text("Attended Classes") }
+                            )
+                            OutlinedTextField(
+                                value = totalClasses.toString(),
+                                onValueChange = { totalClasses = it.toIntOrNull() ?: 0 },
+                                label = { Text("Total Classes") }
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        Button(onClick = {
+                            coroutineScope.launch {
+                                attendanceViewModel.updateManualAttendance(
+                                    editingSubject!!.id,
+                                    attendedClasses,
+                                    totalClasses,
+                                    note = "Manual record updated",
+                                    date = today
+                                )
+                                errorMessage = "Attendance record updated manually"
+                            }
+                            showEditDialog = false
+                        }) {
+                            Text("Save")
+                        }
+                    },
+                    dismissButton = {
+                        Button(onClick = { showEditDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
         }
     }
 }
@@ -145,7 +195,8 @@ fun SubjectCard(
     attendanceViewModel: AttendanceViewModel,
     today: String,
     onEdit: () -> Unit,
-    onDeleteSuccess: (String) -> Unit
+    onDeleteSuccess: (String) -> Unit,
+    onEditAttendance: () -> Unit
 ) {
     val attendanceHistory by attendanceViewModel.attendanceHistory.collectAsState()
     val attendancePercentage by attendanceViewModel.attendancePercentage.collectAsState()
@@ -168,6 +219,8 @@ fun SubjectCard(
                     Text(subject.name, style = MaterialTheme.typography.titleMedium)
                     Text(subject.type, style = MaterialTheme.typography.bodyMedium)
                     Text("Threshold: ${subject.threshold}%", style = MaterialTheme.typography.bodySmall)
+                    // Display attended and total classes
+                    Text("Attended: ${subject.attendedClasses} / Total: ${subject.totalClasses}", style = MaterialTheme.typography.bodySmall)
                 }
                 IconButton(onClick = {
                     localCoroutineScope.launch {
@@ -205,8 +258,13 @@ fun SubjectCard(
                 Text("No attendance records yet.", style = MaterialTheme.typography.bodySmall)
             } else {
                 attendanceHistory.take(5).forEach { record ->
-                    Text("${record.date}: ${record.status}", style = MaterialTheme.typography.bodySmall)
+                    val statusText = if (record.note != null && record.note.contains("Manual record updated")) "Updated" else record.status.name
+                    Text("${record.date}: $statusText", style = MaterialTheme.typography.bodySmall)
                 }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(onClick = onEditAttendance) {
+                Text("Edit Attendance")
             }
         }
     }

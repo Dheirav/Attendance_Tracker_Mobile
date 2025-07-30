@@ -8,5 +8,7 @@ data class Subject(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val name: String,
     val type: String, // "Core", "Elective", "Lab"
-    val threshold: Int = 75
+    val threshold: Int = 75,
+    val attendedClasses: Int = 0,
+    val totalClasses: Int = 0
 )

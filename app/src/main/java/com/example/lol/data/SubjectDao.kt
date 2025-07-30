@@ -16,4 +16,7 @@ interface SubjectDao {
 
     @Update
     suspend fun updateSubject(subject: Subject)
+
+    @Query("SELECT * FROM subjects WHERE id = :id LIMIT 1")
+    suspend fun getSubjectById(id: Int): Subject?
 }

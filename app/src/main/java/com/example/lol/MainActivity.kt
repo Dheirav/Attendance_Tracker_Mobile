@@ -57,8 +57,14 @@ class MainActivity : ComponentActivity() {
                 val items = listOf(
                     BottomNavItem.Home,
                     BottomNavItem.Subjects,
-                    BottomNavItem.Timetable
+                    BottomNavItem.Timetable,
+                    BottomNavItem.CommonSlots
                 )
+                val commonSlotViewModel: com.example.lol.viewmodel.CommonSlotViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+                // Always call insertDefaultSlotsIfEmpty; it only inserts if table is empty
+                commonSlotViewModel.insertDefaultSlotsIfEmpty()
+                val attendanceRepository = remember { com.example.lol.repository.AttendanceRepository(db.attendanceDao(), db.subjectDao()) }
+                val attendanceViewModel = remember { com.example.lol.viewmodel.AttendanceViewModel(attendanceRepository) }
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     bottomBar = {
@@ -87,6 +93,8 @@ class MainActivity : ComponentActivity() {
                         navController = navController,
                         repository = repository,
                         timetableViewModel = timetableViewModel,
+                        commonSlotViewModel = commonSlotViewModel,
+                        attendanceViewModel = attendanceViewModel,
                         modifier = Modifier.padding(innerPadding)
                     )
                 }

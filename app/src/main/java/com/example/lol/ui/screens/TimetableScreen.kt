@@ -15,8 +15,11 @@ import androidx.compose.ui.unit.dp
 import com.example.lol.viewmodel.TimetableViewModel
 import com.example.lol.data.TimetableEntry
 import com.example.lol.data.SubjectRepository
+import com.example.lol.viewmodel.CommonSlotViewModel
+import com.example.lol.data.CommonSlotEntity
 import java.time.DayOfWeek
 import java.time.format.TextStyle
+import java.time.format.DateTimeFormatter
 import com.vanpra.composematerialdialogs.MaterialDialog
 import com.vanpra.composematerialdialogs.MaterialDialogButtons
 import com.vanpra.composematerialdialogs.datetime.time.timepicker
@@ -26,19 +29,17 @@ import java.util.*
 import java.util.Locale
 import kotlinx.coroutines.launch
 import java.util.Calendar
-
-// Data class for user-defined common slots
-data class CommonSlot(
-    val label: String,
-    val startTime: String,
-    val endTime: String
-)
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextAlign
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimetableScreen(
     timetableViewModel: TimetableViewModel,
-    subjectRepository: SubjectRepository
+    subjectRepository: SubjectRepository,
+    commonSlotViewModel: CommonSlotViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
     val daysOfWeek = DayOfWeek.values().map { it.getDisplayName(TextStyle.FULL, Locale.getDefault()) }
     var selectedDay by remember { mutableStateOf(daysOfWeek[0]) }
@@ -47,11 +48,12 @@ fun TimetableScreen(
     var editingEntry by remember { mutableStateOf<TimetableEntry?>(null) }
     var subject by remember { mutableStateOf("") }
     val subjects by subjectRepository.allSubjects.collectAsState(initial = emptyList())
-    var startTime by remember { mutableStateOf(LocalTime.parse("09:00")) }
-    var endTime by remember { mutableStateOf(LocalTime.parse("10:00")) }
+    var startTime by remember { mutableStateOf(LocalTime.parse("09:00 AM", DateTimeFormatter.ofPattern("hh:mm a"))) }
+    var endTime by remember { mutableStateOf(LocalTime.parse("10:00 AM", DateTimeFormatter.ofPattern("hh:mm a"))) }
     val snackbarHostState = remember { SnackbarHostState() }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
+    val slotEntities by commonSlotViewModel.slots.collectAsState() 
 
     LaunchedEffect(errorMessage) {
         errorMessage?.let {
@@ -59,34 +61,23 @@ fun TimetableScreen(
             errorMessage = null
         }
     }
-
-    val commonSlots = remember { mutableStateListOf<CommonSlot>() }
-    var showAddSlotDialog by remember { mutableStateOf(false) }
-    var newSlotLabel by remember { mutableStateOf("") }
-    var newSlotStart by remember { mutableStateOf("") }
-    var newSlotEnd by remember { mutableStateOf("") }
-
+    
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Timetable Editor") })
-        },
-        floatingActionButton = {
-            Row {
-                FloatingActionButton(onClick = {
-                    editingEntry = null
-                    subject = ""
-                    startTime = LocalTime.parse("09:00")
-                    endTime = LocalTime.parse("10:00")
-                    showDialog = true
-                }, modifier = Modifier.padding(end = 12.dp)) {
-                    Icon(Icons.Filled.Edit, contentDescription = "Add Timetable Entry")
+            TopAppBar(
+                title = { Text("Timetable Editor") },
+                actions = {
+                    IconButton(onClick = {
+                        editingEntry = null
+                        subject = ""
+                        startTime = LocalTime.parse("09:00 AM", DateTimeFormatter.ofPattern("hh:mm a"))
+                        endTime = LocalTime.parse("10:00 AM", DateTimeFormatter.ofPattern("hh:mm a"))
+                        showDialog = true
+                    }) {
+                        Icon(Icons.Filled.Add, contentDescription = "Add Timetable Entry")
+                    }
                 }
-                FloatingActionButton(onClick = {
-                    showAddSlotDialog = true
-                }) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add Common Slot")
-                }
-            }
+            )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { innerPadding ->
@@ -94,22 +85,6 @@ fun TimetableScreen(
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(8.dp)) {
                 Text("Select Day :", modifier = Modifier.padding(end = 8.dp))
                 DropdownMenuBox(daysOfWeek, selectedDay) { selectedDay = it }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("Common Time Slots:", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
-            if (commonSlots.isEmpty()) {
-                Text("No common slots defined", modifier = Modifier.padding(8.dp), color = MaterialTheme.colorScheme.error)
-            } else {
-                Column(modifier = Modifier.padding(start = 8.dp, end = 8.dp)) {
-                    commonSlots.forEachIndexed { idx, slot ->
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-                            Text("${slot.label}: ${slot.startTime} - ${slot.endTime}", modifier = Modifier.weight(1f))
-                            IconButton(onClick = { commonSlots.removeAt(idx) }) {
-                                Icon(Icons.Filled.Delete, contentDescription = "Delete Slot")
-                            }
-                        }
-                    }
-                }
             }
             Spacer(modifier = Modifier.height(8.dp))
             if (timetableEntries.isEmpty()) {
@@ -131,8 +106,8 @@ fun TimetableScreen(
                                 IconButton(onClick = {
                                     editingEntry = entry
                                     subject = entry.subject
-                                    startTime = try { LocalTime.parse(entry.startTime) } catch (e: Exception) { LocalTime.parse("09:00") }
-                                    endTime = try { LocalTime.parse(entry.endTime) } catch (e: Exception) { LocalTime.parse("10:00") }
+                                    startTime = try { LocalTime.parse(entry.startTime, DateTimeFormatter.ofPattern("hh:mm a")) } catch (e: Exception) { LocalTime.parse("09:00 AM", DateTimeFormatter.ofPattern("hh:mm a")) }
+                                    endTime = try { LocalTime.parse(entry.endTime, DateTimeFormatter.ofPattern("hh:mm a")) } catch (e: Exception) { LocalTime.parse("10:00 AM", DateTimeFormatter.ofPattern("hh:mm a")) }
                                     showDialog = true
                                 }) {
                                     Icon(Icons.Filled.Edit, contentDescription = "Edit")
@@ -158,9 +133,9 @@ fun TimetableScreen(
                     text = {
                         Column {
                             var subjectDropdownExpanded by remember { mutableStateOf(false) }
-                            var slotDropdownExpanded by remember { mutableStateOf(false) }
-                            val startTimeDialogState = rememberMaterialDialogState()
-                            val endTimeDialogState = rememberMaterialDialogState()
+                            var selectedCommonSlotLabel by remember { mutableStateOf("") }
+                            var commonSlotDropdownExpanded by remember { mutableStateOf(false) }
+                            
                             ExposedDropdownMenuBox(
                                 expanded = subjectDropdownExpanded,
                                 onExpandedChange = { subjectDropdownExpanded = it }
@@ -188,44 +163,41 @@ fun TimetableScreen(
                                     }
                                 }
                             }
+                            
                             ExposedDropdownMenuBox(
-                                expanded = slotDropdownExpanded,
-                                onExpandedChange = { slotDropdownExpanded = it }
+                                expanded = commonSlotDropdownExpanded,
+                                onExpandedChange = { commonSlotDropdownExpanded = it }
                             ) {
                                 OutlinedTextField(
-                                    value = commonSlots.find {
-                                        try {
-                                            LocalTime.parse(it.startTime) == startTime && LocalTime.parse(it.endTime) == endTime
-                                        } catch (e: Exception) { false }
-                                    }?.let { "${it.label}: ${it.startTime} - ${it.endTime}" } ?: "Custom",
+                                    value = selectedCommonSlotLabel,
                                     onValueChange = {},
                                     readOnly = true,
-                                    label = { Text("Common Slot") },
-                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = slotDropdownExpanded) },
+                                    label = { Text("Common Slot (optional)") },
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = commonSlotDropdownExpanded) },
                                     modifier = Modifier.menuAnchor()
                                 )
                                 ExposedDropdownMenu(
-                                    expanded = slotDropdownExpanded,
-                                    onDismissRequest = { slotDropdownExpanded = false }
+                                    expanded = commonSlotDropdownExpanded,
+                                    onDismissRequest = { commonSlotDropdownExpanded = false }
                                 ) {
-                                    if (commonSlots.isEmpty()) {
-                                        DropdownMenuItem(text = { Text("No common slots defined") }, onClick = { slotDropdownExpanded = false })
-                                    } else {
-                                        commonSlots.forEach { slot ->
-                                            DropdownMenuItem(
-                                                text = { Text("${slot.label}: ${slot.startTime} - ${slot.endTime}") },
-                                                onClick = {
-                                                    startTime = try { LocalTime.parse(slot.startTime) } catch (e: Exception) { startTime }
-                                                    endTime = try { LocalTime.parse(slot.endTime) } catch (e: Exception) { endTime }
-                                                    slotDropdownExpanded = false
-                                                }
-                                            )
-                                        }
+                                    slotEntities.forEach { slot ->
+                                        DropdownMenuItem(
+                                            text = { Text("${slot.label} (${slot.startTime}-${slot.endTime})") },
+                                            onClick = {
+                                                selectedCommonSlotLabel = slot.label
+                                                startTime = LocalTime.parse(slot.startTime, DateTimeFormatter.ofPattern("hh:mm a"))
+                                                endTime = LocalTime.parse(slot.endTime, DateTimeFormatter.ofPattern("hh:mm a"))
+                                                commonSlotDropdownExpanded = false
+                                            }
+                                        )
                                     }
                                 }
                             }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            androidx.compose.material3.Text("Start Time:")
                             TimePickerDialogSample(selectedTime = startTime, onTimeSelected = { selected -> startTime = selected })
                             Spacer(modifier = Modifier.height(8.dp))
+                            androidx.compose.material3.Text("End Time:")
                             TimePickerDialogSample(selectedTime = endTime, onTimeSelected = { selected -> endTime = selected })
                         }
                     },
@@ -236,8 +208,8 @@ fun TimetableScreen(
                                 return@Button
                             }
                             coroutineScope.launch {
-                                val startStr = startTime.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
-                                val endStr = endTime.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+                                val startStr = startTime.format(java.time.format.DateTimeFormatter.ofPattern("hh:mm a"))
+                                val endStr = endTime.format(java.time.format.DateTimeFormatter.ofPattern("hh:mm a"))
                                 if (editingEntry == null) {
                                     timetableViewModel.addEntry(
                                         TimetableEntry(
@@ -274,49 +246,6 @@ fun TimetableScreen(
                     }
                 )
             }
-
-            if (showAddSlotDialog) {
-                AlertDialog(
-                    onDismissRequest = { showAddSlotDialog = false },
-                    title = { Text("Add Common Slot") },
-                    text = {
-                        Column {
-                            OutlinedTextField(
-                                value = newSlotLabel,
-                                onValueChange = { newSlotLabel = it },
-                                label = { Text("Label/Subject") },
-                                singleLine = true
-                            )
-                            OutlinedTextField(
-                                value = newSlotStart,
-                                onValueChange = { newSlotStart = it },
-                                label = { Text("Start Time (e.g. 09:00)") },
-                                singleLine = true
-                            )
-                            OutlinedTextField(
-                                value = newSlotEnd,
-                                onValueChange = { newSlotEnd = it },
-                                label = { Text("End Time (e.g. 10:00)") },
-                                singleLine = true
-                            )
-                        }
-                    },
-                    confirmButton = {
-                        Button(onClick = {
-                            if (newSlotLabel.isNotBlank() && newSlotStart.isNotBlank() && newSlotEnd.isNotBlank()) {
-                                commonSlots.add(CommonSlot(newSlotLabel, newSlotStart, newSlotEnd))
-                                newSlotLabel = ""
-                                newSlotStart = ""
-                                newSlotEnd = ""
-                                showAddSlotDialog = false
-                            }
-                        }) { Text("Add") }
-                    },
-                    dismissButton = {
-                        OutlinedButton(onClick = { showAddSlotDialog = false }) { Text("Cancel") }
-                    }
-                )
-            }
         }
     }
 }
@@ -329,26 +258,36 @@ fun TimePickerDialogSample(
     val timeDialogState = rememberMaterialDialogState()
     val time = remember { mutableStateOf(selectedTime) }
 
-    // This opens the dialog when called
-    Column {
-        Button(onClick = { timeDialogState.show() }) {
-            Text("Pick Time: ${time.value}")
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .padding(vertical = 4.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable { timeDialogState.show() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = time.value.format(java.time.format.DateTimeFormatter.ofPattern("hh:mm a")),
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+    MaterialDialog(
+        dialogState = timeDialogState,
+        buttons = {
+            positiveButton("OK")
+            negativeButton("Cancel")
         }
-
-        MaterialDialog(
-            dialogState = timeDialogState,
-            buttons = {
-                positiveButton("OK")
-                negativeButton("Cancel")
-            }
-        ) {
-            timepicker(
-                initialTime = selectedTime,
-                title = "Select Time"
-            ) { newTime ->
-                onTimeSelected(newTime)
-                time.value = newTime
-            }
+    ) {
+        timepicker(
+            initialTime = time.value,
+            title = "Select Time"
+        ) { newTime ->
+            onTimeSelected(newTime)
+            time.value = newTime
         }
     }
 }

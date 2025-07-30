@@ -1,13 +1,32 @@
-package com.example.lol.repository
 
+package com.example.lol.repository
 import com.example.lol.data.Attendance
 import com.example.lol.data.AttendanceDao
 import com.example.lol.data.AttendanceStatus
+import com.example.lol.data.SubjectDao
+import com.example.lol.data.Subject
 
-class AttendanceRepository(private val attendanceDao: AttendanceDao) {
+class AttendanceRepository(private val attendanceDao: AttendanceDao, private val subjectDao: SubjectDao) {
     suspend fun markAttendance(subjectId: Int, date: String, status: AttendanceStatus) {
         val attendance = Attendance(subjectId = subjectId, date = date, status = status)
         attendanceDao.insertAttendance(attendance)
+    }
+
+    suspend fun getSubjectById(subjectId: Int): Subject? {
+        return subjectDao.getSubjectById(subjectId)
+    }
+    
+    suspend fun addManualHistory(subjectId: Int, date: String, note: String) {
+        val manual = Attendance(subjectId = subjectId, date = date, status = AttendanceStatus.PRESENT, note = note)
+        attendanceDao.insertManualHistory(manual)
+    }
+
+    suspend fun updateSubjectAttendance(subjectId: Int, attended: Int, total: Int) {
+        val subject = subjectDao.getSubjectById(subjectId)
+        if (subject != null) {
+            val updated = subject.copy(attendedClasses = attended, totalClasses = total)
+            subjectDao.updateSubject(updated)
+        }
     }
 
     suspend fun getAttendanceHistory(subjectId: Int) = attendanceDao.getAttendanceForSubject(subjectId)
