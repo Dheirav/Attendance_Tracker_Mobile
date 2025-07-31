@@ -9,5 +9,6 @@ data class TimetableEntry(
     val dayOfWeek: String, // e.g. "Monday"
     val subject: String,
     val startTime: String, // e.g. "09:00"
-    val endTime: String    // e.g. "10:00"
+    val endTime: String,   // e.g. "10:00"
+    val slotIds: List<Int> 
 )

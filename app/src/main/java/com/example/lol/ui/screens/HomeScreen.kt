@@ -8,6 +8,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.background
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -17,7 +21,6 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import com.example.lol.viewmodel.TimetableViewModel
@@ -31,6 +34,10 @@ import java.time.format.TextStyle
 import java.util.Locale
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Arrangement
+import com.example.lol.ui.components.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,7 +55,6 @@ fun HomeScreen(
     val subjects by subjectRepository.allSubjects.collectAsState(initial = emptyList())
     val slotEntities by commonSlotViewModel.slots.collectAsState()
     var selectedSlotLabel by remember { mutableStateOf("") }
-    var commonSlotDropdownExpanded by remember { mutableStateOf(false) }
     var startTime by remember { mutableStateOf("") }
     var endTime by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -102,91 +108,195 @@ fun HomeScreen(
             } else {
                 Column(modifier = Modifier.fillMaxSize()) {
                     timetableEntries.forEach { entry ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(8.dp),
-                            elevation = CardDefaults.cardElevation(2.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(entry.subject, style = MaterialTheme.typography.titleMedium)
-                                    Text("${entry.startTime} - ${entry.endTime}", style = MaterialTheme.typography.bodyMedium)
+                        // Find the slot(s) for this entry
+                        val entrySlots = slotEntities.filter {
+                            LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a")) >= LocalTime.parse(entry.startTime, DateTimeFormatter.ofPattern("hh:mm a")) &&
+                            LocalTime.parse(it.endTime, DateTimeFormatter.ofPattern("hh:mm a")) <= LocalTime.parse(entry.endTime, DateTimeFormatter.ofPattern("hh:mm a"))
+                        }
+                        val selectedSlots: List<Int> = entrySlots.map { it.id }
+                        val dismissState = rememberCustomDismissState()
+                        if (dismissState.value == CustomDismissValue.DismissedToEnd || dismissState.value == CustomDismissValue.DismissedToStart) {
+                            val subjectId = subjects.find { it.name == entry.subject }?.id ?: 0
+                            coroutineScope.launch {
+                                if (dismissState.value == CustomDismissValue.DismissedToEnd) {
+                                    attendanceViewModel.markAttendance(
+                                        subjectId = subjectId,
+                                        selectedSlots = selectedSlots,
+                                        date = todayDate.toString(),
+                                        status = AttendanceStatus.PRESENT
+                                    )
+                                    errorMessage = "Marked Present for ${entry.subject}"
+                                } else if (dismissState.value == CustomDismissValue.DismissedToStart) {
+                                    attendanceViewModel.markAttendance(
+                                        subjectId = subjectId,
+                                        selectedSlots = selectedSlots,
+                                        date = todayDate.toString(),
+                                        status = AttendanceStatus.ABSENT
+                                    )
+                                    errorMessage = "Marked Absent for ${entry.subject}"
                                 }
-                                // --- Attendance Controls ---
-                                var attendanceMarked by remember { mutableStateOf<Boolean?>(null) }
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("Attendance:", modifier = Modifier.padding(end = 4.dp))
-                                    IconButton(onClick = {
-                                        attendanceMarked = true
-                                        val subjectId = subjects.find { it.name == entry.subject }?.id ?: 0
-                                        coroutineScope.launch {
-                                            attendanceViewModel.markAttendance(
-                                                subjectId = subjectId,
-                                                date = todayDate.toString(),
-                                                status = AttendanceStatus.PRESENT
-                                            )
-                                            errorMessage = "Marked Present for ${entry.subject}"
-                                        }
-                                    }) {
-                                        Icon(Icons.Filled.Check, contentDescription = "Present", tint = if (attendanceMarked == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
-                                    }
-                                    IconButton(onClick = {
-                                        attendanceMarked = false
-                                        val subjectId = subjects.find { it.name == entry.subject }?.id ?: 0
-                                        coroutineScope.launch {
-                                            attendanceViewModel.markAttendance(
-                                                subjectId = subjectId,
-                                                date = todayDate.toString(),
-                                                status = AttendanceStatus.ABSENT
-                                            )
-                                            errorMessage = "Marked Absent for ${entry.subject}"
-                                        }
-                                    }) {
-                                        Icon(Icons.Filled.Close, contentDescription = "Absent", tint = if (attendanceMarked == false) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
-                                    }
-                                }
-                                // --- Edit/Delete Controls ---
-                                IconButton(onClick = {
-                                    editingEntry = entry
-                                    subject = entry.subject
-                                    startTime = entry.startTime
-                                    endTime = entry.endTime
-                                    showDialog = true
-                                }) {
-                                    Icon(Icons.Filled.Edit, contentDescription = "Edit")
-                                }
-                                IconButton(onClick = {
-                                    coroutineScope.launch {
-                                        timetableViewModel.deleteEntry(entry)
-                                        errorMessage = "Entry deleted"
-                                    }
-                                }) {
-                                    Icon(Icons.Filled.Delete, contentDescription = "Delete")
-                                }
+                                dismissState.value = CustomDismissValue.Default
                             }
                         }
+                        CustomSwipeToDismiss(
+                            state = dismissState,
+                            background = { direction ->
+                                val color = when (direction) {
+                                    CustomDismissDirection.StartToEnd -> MaterialTheme.colorScheme.primary
+                                    CustomDismissDirection.EndToStart -> MaterialTheme.colorScheme.error
+                                }
+                                Box(
+                                    Modifier
+                                        .fillMaxSize()
+                                        .background(color)
+                                )
+                            },
+                            content = {
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(8.dp),
+                                    elevation = CardDefaults.cardElevation(2.dp)
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(16.dp)
+                                    ) {
+                                        Text(entry.subject, style = MaterialTheme.typography.titleMedium)
+                                        Text("${entry.startTime} - ${entry.endTime}", style = MaterialTheme.typography.bodyMedium)
+                                        // --- Attendance Progress Bar ---
+                                        val subjectObj = subjects.find { it.name == entry.subject }
+                                        val attended = subjectObj?.attendedClasses ?: 0
+                                        val total = subjectObj?.totalClasses ?: 0
+                                        val threshold = subjectObj?.threshold ?: 75
+                                        val attendancePercent = if (total > 0) attended * 100 / total else 0
+                                        val thresholdPercent = threshold 
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Box(modifier = Modifier.fillMaxWidth().height(20.dp)) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f))
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxHeight()
+                                                    .fillMaxWidth(fraction = thresholdPercent / 100f)
+                                                    .background(MaterialTheme.colorScheme.error.copy(alpha = 0.75f))
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxHeight()
+                                                    .fillMaxWidth(fraction = attendancePercent / 100f)
+                                                    .background(MaterialTheme.colorScheme.primary)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text("Attendance: $attendancePercent%", style = MaterialTheme.typography.bodyMedium)
+                                            Text("Threshold: $thresholdPercent%", style = MaterialTheme.typography.bodyMedium)
+                                        }
+                                        // --- Edit/Delete Controls ---
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.End
+                                        ) {
+                                            IconButton(onClick = {
+                                                editingEntry = entry
+                                                subject = entry.subject
+                                                startTime = entry.startTime
+                                                endTime = entry.endTime
+                                                showDialog = true
+                                            }) {
+                                                Icon(Icons.Filled.Edit, contentDescription = "Edit")
+                                            }
+                                            IconButton(onClick = {
+                                                coroutineScope.launch {
+                                                    timetableViewModel.deleteEntry(entry)
+                                                    errorMessage = "Entry deleted"
+                                                }
+                                            }) {
+                                                Icon(Icons.Filled.Delete, contentDescription = "Delete")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        )
                     }
                 }
             }
 
             if (showDialog) {
+                var subjectDropdownExpanded by remember { mutableStateOf(false) }
+                val subjectOptions = subjects.map { it.name }
+                var selectedSubject by remember { mutableStateOf(subjectOptions.firstOrNull() ?: "") }
+                val selectedSlotIds = remember { mutableStateListOf<Int>() }
+                var slotSelectionError by remember { mutableStateOf<String?>(null) }
+            
                 AlertDialog(
                     onDismissRequest = { showDialog = false },
+                    confirmButton = {
+                        Button(onClick = {
+                            if (selectedSubject.isBlank() || selectedSlotIds.isEmpty() || slotSelectionError != null) {
+                                errorMessage = slotSelectionError ?: "Please select subject and valid slots."
+                                return@Button
+                            }
+                            coroutineScope.launch {
+                                val selectedSlots = slotEntities.filter { selectedSlotIds.contains(it.id) }
+                                    .sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a")) }
+                                val startStr = selectedSlots.first().startTime
+                                val endStr = selectedSlots.last().endTime
+                                if (editingEntry == null) {
+                                    timetableViewModel.addEntry(
+                                        TimetableEntry(
+                                            dayOfWeek = today ,
+                                            subject = selectedSubject,
+                                            startTime = startStr,
+                                            endTime = endStr,
+                                            slotIds = selectedSlotIds.toList()
+                                        )
+                                    )
+                                    errorMessage = "Entry added"
+                                } else {
+                                    timetableViewModel.deleteEntry(editingEntry!!)
+                                    timetableViewModel.addEntry(
+                                        TimetableEntry(
+                                            id = editingEntry!!.id,
+                                            dayOfWeek = today ,
+                                            subject = selectedSubject,
+                                            startTime = startStr,
+                                            endTime = endStr,
+                                            slotIds = selectedSlotIds.toList()
+                                        )
+                                    )
+                                    errorMessage = "Entry updated"
+                                }
+                                showDialog = false
+                            }
+                        }) {
+                            Text("Save")
+                        }
+                    },
+                    dismissButton = {
+                        OutlinedButton(onClick = { showDialog = false }) {
+                            Text("Cancel")
+                        }
+                    },
                     title = { Text(if (editingEntry == null) "Add Timetable Entry" else "Edit Timetable Entry") },
                     text = {
                         Column {
-                            var subjectDropdownExpanded by remember { mutableStateOf(false) }
-                            // --- Subject Dropdown ---
+                            Text("Select Subject:")
                             ExposedDropdownMenuBox(
                                 expanded = subjectDropdownExpanded,
                                 onExpandedChange = { subjectDropdownExpanded = it }
                             ) {
                                 OutlinedTextField(
-                                    value = subject,
+                                    value = selectedSubject,
                                     onValueChange = {},
                                     readOnly = true,
                                     label = { Text("Subject") },
@@ -197,115 +307,61 @@ fun HomeScreen(
                                     expanded = subjectDropdownExpanded,
                                     onDismissRequest = { subjectDropdownExpanded = false }
                                 ) {
-                                    subjects.forEach { subj ->
+                                    subjectOptions.forEach { subj ->
                                         DropdownMenuItem(
-                                            text = { Text(subj.name) },
+                                            text = { Text(subj) },
                                             onClick = {
-                                                subject = subj.name
+                                                selectedSubject = subj
                                                 subjectDropdownExpanded = false
                                             }
                                         )
                                     }
                                 }
                             }
-            // --- Common Slot Dropdown (from DB) ---
-            ExposedDropdownMenuBox(
-                expanded = commonSlotDropdownExpanded,
-                onExpandedChange = { commonSlotDropdownExpanded = it }
-            ) {
-                OutlinedTextField(
-                    value = selectedSlotLabel,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Common Slot (optional)") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = commonSlotDropdownExpanded) },
-                    modifier = Modifier.menuAnchor()
-                )
-                ExposedDropdownMenu(
-                    expanded = commonSlotDropdownExpanded,
-                    onDismissRequest = { commonSlotDropdownExpanded = false }
-                ) {
-                    if (slotEntities.isEmpty()) {
-                        DropdownMenuItem(
-                            text = { Text("No common slots defined") },
-                            onClick = { commonSlotDropdownExpanded = false }
-                        )
-                    } else {
-                        slotEntities.forEach { slot ->
-                            DropdownMenuItem(
-                                text = { Text("${slot.label} (${slot.startTime}-${slot.endTime})") },
-                                onClick = {
-                                    selectedSlotLabel = slot.label
-                                    startTime = slot.startTime
-                                    endTime = slot.endTime
-                                    commonSlotDropdownExpanded = false
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("Select Time Slots (≤20 min gap):")
+                            Box(modifier = Modifier.height(220.dp)) {
+                                LazyColumn {
+                                    items(slotEntities.sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a")) }) { slot ->
+                                        val checked = selectedSlotIds.contains(slot.id)
+                                        Button(
+                                            onClick = {
+                                                if (!checked) {
+                                                    val allSelected = selectedSlotIds + slot.id
+                                                    val sortedSlots = slotEntities.filter { allSelected.contains(it.id) }
+                                                        .sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a")) }
+                                                    val valid = sortedSlots.zipWithNext().all { (a, b) ->
+                                                        val aEnd = LocalTime.parse(a.endTime, DateTimeFormatter.ofPattern("hh:mm a"))
+                                                        val bStart = LocalTime.parse(b.startTime, DateTimeFormatter.ofPattern("hh:mm a"))
+                                                        java.time.Duration.between(aEnd, bStart).toMinutes() <= 20
+                                                    }
+                                                    if (valid) {
+                                                        selectedSlotIds.add(slot.id)
+                                                        slotSelectionError = null
+                                                    } else {
+                                                        slotSelectionError = "Selected slots must be consecutive with ≤20 min gap."
+                                                    }
+                                                } else {
+                                                    selectedSlotIds.remove(slot.id)
+                                                    slotSelectionError = null
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                                contentColor = if (checked) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                                            ),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp)
+                                        ) {
+                                            Text("${slot.label}: ${slot.startTime} - ${slot.endTime}")
+                                        }
+                                    }
                                 }
-                            )
-                        }
-                    }
-                }
-            }
-            // Show assigned time if a slot is selected
-            val selectedSlot = slotEntities.find { it.label == selectedSlotLabel }
-            selectedSlot?.let {
-                Text("Assigned Time: ${it.startTime} - ${it.endTime}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 4.dp))
-            }
-
-                            // --- Manual override with TimePickerDialogSample ---
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("Start Time:")
-                            TimePickerDialogSample(
-                                selectedTime = if (startTime.isNotBlank()) LocalTime.parse(startTime, DateTimeFormatter.ofPattern("hh:mm a")) else LocalTime.parse("09:00 AM", DateTimeFormatter.ofPattern("hh:mm a")),
-                                onTimeSelected = { selected -> startTime = selected.format(DateTimeFormatter.ofPattern("hh:mm a")); selectedSlotLabel = "" }
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("End Time:")
-                            TimePickerDialogSample(
-                                selectedTime = if (endTime.isNotBlank()) LocalTime.parse(endTime, DateTimeFormatter.ofPattern("hh:mm a")) else LocalTime.parse("10:00 AM", DateTimeFormatter.ofPattern("hh:mm a")),
-                                onTimeSelected = { selected -> endTime = selected.format(DateTimeFormatter.ofPattern("hh:mm a")); selectedSlotLabel = "" }
-                            )
-                        }
-                    },
-                    confirmButton = {
-                        Button(onClick = {
-                            if (subject.isBlank() || startTime.isBlank() || endTime.isBlank()) {
-                                errorMessage = "All fields are required."
-                                return@Button
                             }
-                            coroutineScope.launch {
-                                if (editingEntry == null) {
-                                    timetableViewModel.addEntry(
-                                        TimetableEntry(
-                                            dayOfWeek = today,
-                                            subject = subject,
-                                            startTime = startTime,
-                                            endTime = endTime
-                                        )
-                                    )
-                                    errorMessage = "Entry added"
-                                } else {
-                                    timetableViewModel.deleteEntry(editingEntry!!)
-                                    timetableViewModel.addEntry(
-                                        TimetableEntry(
-                                            id = editingEntry!!.id,
-                                            dayOfWeek = today,
-                                            subject = subject,
-                                            startTime = startTime,
-                                            endTime = endTime
-                                        )
-                                    )
-                                    errorMessage = "Entry updated"
-                                }
-                                showDialog = false
-                                selectedSlotLabel = ""
+                            if (slotSelectionError != null) {
+                                Text(slotSelectionError!!, color = MaterialTheme.colorScheme.error)
                             }
-                        }) {
-                            Text("Save")
-                        }
-                    },
-                    dismissButton = {
-                        OutlinedButton(onClick = { showDialog = false }) {
-                            Text("Cancel")
                         }
                     }
                 )

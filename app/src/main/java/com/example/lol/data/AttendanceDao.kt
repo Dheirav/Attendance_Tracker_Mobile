@@ -9,6 +9,9 @@ interface AttendanceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAttendance(attendance: Attendance)
 
+    @Query("SELECT * FROM attendance WHERE subjectId = :subjectId AND slotId = :slotId ORDER BY date DESC")
+    suspend fun getAttendanceForSlot(subjectId: Int, slotId: Int): List<Attendance>
+
     // Insert manual update history
     @Insert
     suspend fun insertManualHistory(attendance: Attendance)

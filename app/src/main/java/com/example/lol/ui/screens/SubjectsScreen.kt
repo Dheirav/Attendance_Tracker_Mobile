@@ -10,6 +10,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.background
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -221,6 +222,33 @@ fun SubjectCard(
                     Text("Threshold: ${subject.threshold}%", style = MaterialTheme.typography.bodySmall)
                     // Display attended and total classes
                     Text("Attended: ${subject.attendedClasses} / Total: ${subject.totalClasses}", style = MaterialTheme.typography.bodySmall)
+                    // --- Attendance Progress Bar ---
+                    val attended = subject.attendedClasses
+                    val total = subject.totalClasses
+                    val threshold = subject.threshold
+                    val attendancePercent = if (total > 0) attended * 100 / total else 0
+                    val thresholdPercent = threshold
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(modifier = Modifier.fillMaxWidth().height(20.dp)) {
+                        // Custom left-to-right progress bars
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f))
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(fraction = thresholdPercent / 100f)
+                                .background(MaterialTheme.colorScheme.error.copy(alpha = 0.75f))
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(fraction = attendancePercent / 100f)
+                                .background(MaterialTheme.colorScheme.primary)
+                        )
+                    }
                 }
                 var showDeleteDialog by remember { mutableStateOf(false) }
                 IconButton(onClick = { showDeleteDialog = true }) {
@@ -245,25 +273,6 @@ fun SubjectCard(
                         }
                     )
                 }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Mark today:", modifier = Modifier.padding(end = 8.dp))
-                Button(onClick = {
-                    localCoroutineScope.launch {
-                        attendanceViewModel.markAttendance(subject.id, today, AttendanceStatus.PRESENT)
-                        attendanceViewModel.loadAttendance(subject.id)
-                    }
-                    onDeleteSuccess("Marked present")
-                }) { Text("Present") }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = {
-                    localCoroutineScope.launch {
-                        attendanceViewModel.markAttendance(subject.id, today, AttendanceStatus.ABSENT)
-                        attendanceViewModel.loadAttendance(subject.id)
-                    }
-                    onDeleteSuccess("Marked absent")
-                }) { Text("Absent") }
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text("Attendance: ${"%.1f".format(attendancePercentage)}%", style = MaterialTheme.typography.bodyMedium)

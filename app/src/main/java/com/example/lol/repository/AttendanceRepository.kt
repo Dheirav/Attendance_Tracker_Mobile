@@ -6,8 +6,8 @@ import com.example.lol.data.SubjectDao
 import com.example.lol.data.Subject
 
 class AttendanceRepository(private val attendanceDao: AttendanceDao, private val subjectDao: SubjectDao) {
-    suspend fun markAttendance(subjectId: Int, date: String, status: AttendanceStatus) {
-        val attendance = Attendance(subjectId = subjectId, date = date, status = status)
+    suspend fun markAttendanceForSlot(subjectId: Int, slotId: Int, date: String, status: AttendanceStatus) {
+        val attendance = Attendance(subjectId = subjectId, slotId = slotId, date = date, status = status)
         attendanceDao.insertAttendance(attendance)
     }
 
@@ -20,7 +20,7 @@ class AttendanceRepository(private val attendanceDao: AttendanceDao, private val
     }
     
     suspend fun addManualHistory(subjectId: Int, date: String, note: String) {
-        val manual = Attendance(subjectId = subjectId, date = date, status = AttendanceStatus.PRESENT, note = note)
+        val manual = Attendance(subjectId = subjectId, slotId = -1, date = date, status = AttendanceStatus.PRESENT, note = note)
         attendanceDao.insertManualHistory(manual)
     }
 

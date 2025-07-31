@@ -33,6 +33,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,7 +48,7 @@ fun TimetableScreen(
     val timetableEntries by timetableViewModel.getEntriesForDay(selectedDay).collectAsState()
     var showDialog by remember { mutableStateOf(false) }
     var editingEntry by remember { mutableStateOf<TimetableEntry?>(null) }
-    var subject by remember { mutableStateOf("") }
+    var subject by remember { mutableStateOf("") } 
     val subjects by subjectRepository.allSubjects.collectAsState(initial = emptyList())
     var startTime by remember { mutableStateOf(LocalTime.parse("09:00 AM", DateTimeFormatter.ofPattern("hh:mm a"))) }
     var endTime by remember { mutableStateOf(LocalTime.parse("10:00 AM", DateTimeFormatter.ofPattern("hh:mm a"))) }
@@ -127,96 +129,33 @@ fun TimetableScreen(
             }
 
             if (showDialog) {
+                var subjectDropdownExpanded by remember { mutableStateOf(false) }
+                val subjectOptions = subjects.map { it.name }
+                var selectedSubject by remember { mutableStateOf(subjectOptions.firstOrNull() ?: "") }
+                val selectedSlotIds = remember { mutableStateListOf<Int>() }
+                var slotSelectionError by remember { mutableStateOf<String?>(null) }
+            
                 AlertDialog(
                     onDismissRequest = { showDialog = false },
-                    title = { Text(if (editingEntry == null) "Add Timetable Entry" else "Edit Timetable Entry") },
-                    text = {
-                        Column {
-                            var subjectDropdownExpanded by remember { mutableStateOf(false) }
-                            var selectedCommonSlotLabel by remember { mutableStateOf("") }
-                            var commonSlotDropdownExpanded by remember { mutableStateOf(false) }
-                            
-                            ExposedDropdownMenuBox(
-                                expanded = subjectDropdownExpanded,
-                                onExpandedChange = { subjectDropdownExpanded = it }
-                            ) {
-                                OutlinedTextField(
-                                    value = subject,
-                                    onValueChange = {},
-                                    readOnly = true,
-                                    label = { Text("Subject") },
-                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = subjectDropdownExpanded) },
-                                    modifier = Modifier.menuAnchor()
-                                )
-                                ExposedDropdownMenu(
-                                    expanded = subjectDropdownExpanded,
-                                    onDismissRequest = { subjectDropdownExpanded = false }
-                                ) {
-                                    subjects.forEach { subj ->
-                                        DropdownMenuItem(
-                                            text = { Text(subj.name) },
-                                            onClick = {
-                                                subject = subj.name
-                                                subjectDropdownExpanded = false
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                            
-                            ExposedDropdownMenuBox(
-                                expanded = commonSlotDropdownExpanded,
-                                onExpandedChange = { commonSlotDropdownExpanded = it }
-                            ) {
-                                OutlinedTextField(
-                                    value = selectedCommonSlotLabel,
-                                    onValueChange = {},
-                                    readOnly = true,
-                                    label = { Text("Common Slot (optional)") },
-                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = commonSlotDropdownExpanded) },
-                                    modifier = Modifier.menuAnchor()
-                                )
-                                ExposedDropdownMenu(
-                                    expanded = commonSlotDropdownExpanded,
-                                    onDismissRequest = { commonSlotDropdownExpanded = false }
-                                ) {
-                                    slotEntities.forEach { slot ->
-                                        DropdownMenuItem(
-                                            text = { Text("${slot.label} (${slot.startTime}-${slot.endTime})") },
-                                            onClick = {
-                                                selectedCommonSlotLabel = slot.label
-                                                startTime = LocalTime.parse(slot.startTime, DateTimeFormatter.ofPattern("hh:mm a"))
-                                                endTime = LocalTime.parse(slot.endTime, DateTimeFormatter.ofPattern("hh:mm a"))
-                                                commonSlotDropdownExpanded = false
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            androidx.compose.material3.Text("Start Time:")
-                            TimePickerDialogSample(selectedTime = startTime, onTimeSelected = { selected -> startTime = selected })
-                            Spacer(modifier = Modifier.height(8.dp))
-                            androidx.compose.material3.Text("End Time:")
-                            TimePickerDialogSample(selectedTime = endTime, onTimeSelected = { selected -> endTime = selected })
-                        }
-                    },
                     confirmButton = {
                         Button(onClick = {
-                            if (subject.isBlank()) {
-                                errorMessage = "All fields are required."
+                            if (selectedSubject.isBlank() || selectedSlotIds.isEmpty() || slotSelectionError != null) {
+                                errorMessage = slotSelectionError ?: "Please select subject and valid slots."
                                 return@Button
                             }
                             coroutineScope.launch {
-                                val startStr = startTime.format(java.time.format.DateTimeFormatter.ofPattern("hh:mm a"))
-                                val endStr = endTime.format(java.time.format.DateTimeFormatter.ofPattern("hh:mm a"))
+                                val selectedSlots = slotEntities.filter { selectedSlotIds.contains(it.id) }
+                                    .sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a")) }
+                                val startStr = selectedSlots.first().startTime
+                                val endStr = selectedSlots.last().endTime
                                 if (editingEntry == null) {
                                     timetableViewModel.addEntry(
                                         TimetableEntry(
                                             dayOfWeek = selectedDay,
-                                            subject = subject,
+                                            subject = selectedSubject,
                                             startTime = startStr,
-                                            endTime = endStr
+                                            endTime = endStr,
+                                            slotIds = selectedSlotIds.toList()
                                         )
                                     )
                                     errorMessage = "Entry added"
@@ -226,9 +165,10 @@ fun TimetableScreen(
                                         TimetableEntry(
                                             id = editingEntry!!.id,
                                             dayOfWeek = selectedDay,
-                                            subject = subject,
+                                            subject = selectedSubject,
                                             startTime = startStr,
-                                            endTime = endStr
+                                            endTime = endStr,
+                                            slotIds = selectedSlotIds.toList()
                                         )
                                     )
                                     errorMessage = "Entry updated"
@@ -242,6 +182,83 @@ fun TimetableScreen(
                     dismissButton = {
                         OutlinedButton(onClick = { showDialog = false }) {
                             Text("Cancel")
+                        }
+                    },
+                    title = { Text(if (editingEntry == null) "Add Timetable Entry" else "Edit Timetable Entry") },
+                    text = {
+                        Column {
+                            Text("Select Subject:")
+                            ExposedDropdownMenuBox(
+                                expanded = subjectDropdownExpanded,
+                                onExpandedChange = { subjectDropdownExpanded = it }
+                            ) {
+                                OutlinedTextField(
+                                    value = selectedSubject,
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    label = { Text("Subject") },
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = subjectDropdownExpanded) },
+                                    modifier = Modifier.menuAnchor()
+                                )
+                                ExposedDropdownMenu(
+                                    expanded = subjectDropdownExpanded,
+                                    onDismissRequest = { subjectDropdownExpanded = false }
+                                ) {
+                                    subjectOptions.forEach { subj ->
+                                        DropdownMenuItem(
+                                            text = { Text(subj) },
+                                            onClick = {
+                                                selectedSubject = subj
+                                                subjectDropdownExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("Select Time Slots (≤20 min gap):")
+                            Box(modifier = Modifier.height(220.dp)) {
+                                LazyColumn {
+                                    items(slotEntities.sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a")) }) { slot ->
+                                        val checked = selectedSlotIds.contains(slot.id)
+                                        Button(
+                                            onClick = {
+                                                if (!checked) {
+                                                    val allSelected = selectedSlotIds + slot.id
+                                                    val sortedSlots = slotEntities.filter { allSelected.contains(it.id) }
+                                                        .sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a")) }
+                                                    val valid = sortedSlots.zipWithNext().all { (a, b) ->
+                                                        val aEnd = LocalTime.parse(a.endTime, DateTimeFormatter.ofPattern("hh:mm a"))
+                                                        val bStart = LocalTime.parse(b.startTime, DateTimeFormatter.ofPattern("hh:mm a"))
+                                                        java.time.Duration.between(aEnd, bStart).toMinutes() <= 20
+                                                    }
+                                                    if (valid) {
+                                                        selectedSlotIds.add(slot.id)
+                                                        slotSelectionError = null
+                                                    } else {
+                                                        slotSelectionError = "Selected slots must be consecutive with ≤20 min gap."
+                                                    }
+                                                } else {
+                                                    selectedSlotIds.remove(slot.id)
+                                                    slotSelectionError = null
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                                contentColor = if (checked) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                                            ),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp)
+                                        ) {
+                                            Text("${slot.label}: ${slot.startTime} - ${slot.endTime}")
+                                        }
+                                    }
+                                }
+                            }
+                            if (slotSelectionError != null) {
+                                Text(slotSelectionError!!, color = MaterialTheme.colorScheme.error)
+                            }
                         }
                     }
                 )

@@ -23,15 +23,17 @@ class AttendanceViewModel(val repository: AttendanceRepository) : ViewModel() {
         }
     }
 
-    fun markAttendance(subjectId: Int, date: String, status: AttendanceStatus) {
+    fun markAttendance(subjectId: Int, selectedSlots: List<Int>, date: String, status: AttendanceStatus) {
         viewModelScope.launch {
-            repository.markAttendance(subjectId, date, status)
-            // Update attended/total classes in Subject
-            val subject = repository.getSubjectById(subjectId)
-            if (subject != null) {
-                val attended = subject.attendedClasses + if (status == AttendanceStatus.PRESENT) 1 else 0
-                val total = subject.totalClasses + 1
-                repository.updateSubjectAttendance(subjectId, attended, total)
+            for (slotId in selectedSlots) {
+                repository.markAttendanceForSlot(subjectId, slotId, date, status)
+                // Update attended/total classes in Subject
+                val subject = repository.getSubjectById(subjectId)
+                if (subject != null) {
+                    val attended = subject.attendedClasses + if (status == AttendanceStatus.PRESENT) 1 else 0
+                    val total = subject.totalClasses + 1
+                    repository.updateSubjectAttendance(subjectId, attended, total)
+                }
             }
             loadAttendance(subjectId)
         }
@@ -49,10 +51,10 @@ class AttendanceViewModel(val repository: AttendanceRepository) : ViewModel() {
                 val absentCount = total - attended
                 val today = date
                 repeat(presentCount) {
-                    repository.markAttendance(subjectId, today, AttendanceStatus.PRESENT)
+                    repository.markAttendanceForSlot(subjectId, -1, today, AttendanceStatus.PRESENT)
                 }
                 repeat(absentCount) {
-                    repository.markAttendance(subjectId, today, AttendanceStatus.ABSENT)
+                    repository.markAttendanceForSlot(subjectId, -1, today, AttendanceStatus.ABSENT)
                 }
             }
             loadAttendance(subjectId)
