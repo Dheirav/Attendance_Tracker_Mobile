@@ -24,6 +24,7 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.draw.clip
+import java.util.Locale
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -115,14 +116,14 @@ fun CommonSlotsManagerScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("Start Time:")
                         TimePickerDialogSample(
-                            selectedTime = if (startTime.isNotBlank()) LocalTime.parse(startTime, DateTimeFormatter.ofPattern("hh:mm a")) else LocalTime.parse("09:00 AM", DateTimeFormatter.ofPattern("hh:mm a")),
-                            onTimeSelected = { selected: LocalTime -> startTime = selected.format(DateTimeFormatter.ofPattern("hh:mm a")) }
+                            selectedTime = if (startTime.isNotBlank()) LocalTime.parse(startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) else LocalTime.parse("09:00 AM", DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())),
+                            onTimeSelected = { selected: LocalTime -> startTime = selected.format(DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("End Time:")
                         TimePickerDialogSample(
-                            selectedTime = if (endTime.isNotBlank()) LocalTime.parse(endTime, DateTimeFormatter.ofPattern("hh:mm a")) else LocalTime.parse("10:00 AM", DateTimeFormatter.ofPattern("hh:mm a")),
-                            onTimeSelected = { selected: LocalTime -> endTime = selected.format(DateTimeFormatter.ofPattern("hh:mm a")) }
+                            selectedTime = if (endTime.isNotBlank()) LocalTime.parse(endTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) else LocalTime.parse("10:00 AM", DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())),
+                            onTimeSelected = { selected: LocalTime -> endTime = selected.format(DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }
                         )
                     }
                 },
@@ -160,14 +161,14 @@ fun CommonSlotsManagerScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("Start Time:")
                         TimePickerDialogSample(
-                            selectedTime = if (startTime.isNotBlank()) LocalTime.parse(startTime, DateTimeFormatter.ofPattern("hh:mm a")) else LocalTime.parse("09:00 AM", DateTimeFormatter.ofPattern("hh:mm a")),
-                            onTimeSelected = { selected -> startTime = selected.format(DateTimeFormatter.ofPattern("hh:mm a")) }
+                            selectedTime = if (startTime.isNotBlank()) LocalTime.parse(startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) else LocalTime.parse("09:00 AM", DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())),
+                            onTimeSelected = { selected -> startTime = selected.format(DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("End Time:")
                         TimePickerDialogSample(
-                            selectedTime = if (endTime.isNotBlank()) LocalTime.parse(endTime, DateTimeFormatter.ofPattern("hh:mm a")) else LocalTime.parse("10:00 AM", DateTimeFormatter.ofPattern("hh:mm a")),
-                            onTimeSelected = { selected -> endTime = selected.format(DateTimeFormatter.ofPattern("hh:mm a")) }
+                            selectedTime = if (endTime.isNotBlank()) LocalTime.parse(endTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) else LocalTime.parse("10:00 AM", DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())),
+                            onTimeSelected = { selected -> endTime = selected.format(DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }
                         )
                     }
                 },

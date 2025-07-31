@@ -110,8 +110,8 @@ fun HomeScreen(
                     timetableEntries.forEach { entry ->
                         // Find the slot(s) for this entry
                         val entrySlots = slotEntities.filter {
-                            LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a")) >= LocalTime.parse(entry.startTime, DateTimeFormatter.ofPattern("hh:mm a")) &&
-                            LocalTime.parse(it.endTime, DateTimeFormatter.ofPattern("hh:mm a")) <= LocalTime.parse(entry.endTime, DateTimeFormatter.ofPattern("hh:mm a"))
+                            LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) >= LocalTime.parse(entry.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) &&
+                            LocalTime.parse(it.endTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) <= LocalTime.parse(entry.endTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault()))
                         }
                         val selectedSlots: List<Int> = entrySlots.map { it.id }
                         val dismissState = rememberCustomDismissState()
@@ -248,7 +248,7 @@ fun HomeScreen(
                             }
                             coroutineScope.launch {
                                 val selectedSlots = slotEntities.filter { selectedSlotIds.contains(it.id) }
-                                    .sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a")) }
+                                    .sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }
                                 val startStr = selectedSlots.first().startTime
                                 val endStr = selectedSlots.last().endTime
                                 if (editingEntry == null) {
@@ -322,17 +322,17 @@ fun HomeScreen(
                             Text("Select Time Slots (≤20 min gap):")
                             Box(modifier = Modifier.height(220.dp)) {
                                 LazyColumn {
-                                    items(slotEntities.sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a")) }) { slot ->
+                                    items(slotEntities.sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }) { slot ->
                                         val checked = selectedSlotIds.contains(slot.id)
                                         Button(
                                             onClick = {
                                                 if (!checked) {
                                                     val allSelected = selectedSlotIds + slot.id
                                                     val sortedSlots = slotEntities.filter { allSelected.contains(it.id) }
-                                                        .sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a")) }
+                                                        .sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }
                                                     val valid = sortedSlots.zipWithNext().all { (a, b) ->
-                                                        val aEnd = LocalTime.parse(a.endTime, DateTimeFormatter.ofPattern("hh:mm a"))
-                                                        val bStart = LocalTime.parse(b.startTime, DateTimeFormatter.ofPattern("hh:mm a"))
+                                                        val aEnd = LocalTime.parse(a.endTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault()))
+                                                        val bStart = LocalTime.parse(b.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault()))
                                                         java.time.Duration.between(aEnd, bStart).toMinutes() <= 20
                                                     }
                                                     if (valid) {

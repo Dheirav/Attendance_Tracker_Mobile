@@ -72,8 +72,8 @@ fun TimetableScreen(
                     IconButton(onClick = {
                         editingEntry = null
                         subject = ""
-                        startTime = LocalTime.parse("09:00 AM", DateTimeFormatter.ofPattern("hh:mm a"))
-                        endTime = LocalTime.parse("10:00 AM", DateTimeFormatter.ofPattern("hh:mm a"))
+                        startTime = LocalTime.parse("09:00 AM", DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault()))
+                        endTime = LocalTime.parse("10:00 AM", DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault()))
                         showDialog = true
                     }) {
                         Icon(Icons.Filled.Add, contentDescription = "Add Timetable Entry")
@@ -108,8 +108,8 @@ fun TimetableScreen(
                                 IconButton(onClick = {
                                     editingEntry = entry
                                     subject = entry.subject
-                                    startTime = try { LocalTime.parse(entry.startTime, DateTimeFormatter.ofPattern("hh:mm a")) } catch (e: Exception) { LocalTime.parse("09:00 AM", DateTimeFormatter.ofPattern("hh:mm a")) }
-                                    endTime = try { LocalTime.parse(entry.endTime, DateTimeFormatter.ofPattern("hh:mm a")) } catch (e: Exception) { LocalTime.parse("10:00 AM", DateTimeFormatter.ofPattern("hh:mm a")) }
+                                    startTime = try { LocalTime.parse(entry.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) } catch (e: Exception) { LocalTime.parse("09:00 AM", DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }
+                                    endTime = try { LocalTime.parse(entry.endTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) } catch (e: Exception) { LocalTime.parse("10:00 AM", DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }
                                     showDialog = true
                                 }) {
                                     Icon(Icons.Filled.Edit, contentDescription = "Edit")
@@ -145,7 +145,7 @@ fun TimetableScreen(
                             }
                             coroutineScope.launch {
                                 val selectedSlots = slotEntities.filter { selectedSlotIds.contains(it.id) }
-                                    .sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a")) }
+                                    .sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }
                                 val startStr = selectedSlots.first().startTime
                                 val endStr = selectedSlots.last().endTime
                                 if (editingEntry == null) {
@@ -219,17 +219,17 @@ fun TimetableScreen(
                             Text("Select Time Slots (≤20 min gap):")
                             Box(modifier = Modifier.height(220.dp)) {
                                 LazyColumn {
-                                    items(slotEntities.sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a")) }) { slot ->
+                                    items(slotEntities.sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }) { slot ->
                                         val checked = selectedSlotIds.contains(slot.id)
                                         Button(
                                             onClick = {
                                                 if (!checked) {
                                                     val allSelected = selectedSlotIds + slot.id
                                                     val sortedSlots = slotEntities.filter { allSelected.contains(it.id) }
-                                                        .sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a")) }
+                                                        .sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }
                                                     val valid = sortedSlots.zipWithNext().all { (a, b) ->
-                                                        val aEnd = LocalTime.parse(a.endTime, DateTimeFormatter.ofPattern("hh:mm a"))
-                                                        val bStart = LocalTime.parse(b.startTime, DateTimeFormatter.ofPattern("hh:mm a"))
+                                                        val aEnd = LocalTime.parse(a.endTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault()))
+                                                        val bStart = LocalTime.parse(b.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault()))
                                                         java.time.Duration.between(aEnd, bStart).toMinutes() <= 20
                                                     }
                                                     if (valid) {
@@ -286,7 +286,7 @@ fun TimePickerDialogSample(
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = time.value.format(java.time.format.DateTimeFormatter.ofPattern("hh:mm a")),
+            text = time.value.format(java.time.format.DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())),
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
