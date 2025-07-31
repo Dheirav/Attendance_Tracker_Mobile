@@ -4,6 +4,8 @@ import androidx.room.*
 
 @Dao
 interface AttendanceDao {
+    @Query("DELETE FROM attendance WHERE subjectId = :subjectId")
+    suspend fun deleteAllForSubject(subjectId: Int)
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAttendance(attendance: Attendance)
 

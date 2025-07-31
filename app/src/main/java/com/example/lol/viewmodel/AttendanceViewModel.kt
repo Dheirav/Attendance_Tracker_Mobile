@@ -42,6 +42,18 @@ class AttendanceViewModel(val repository: AttendanceRepository) : ViewModel() {
             repository.updateSubjectAttendance(subjectId, attended, total)
             if (note != null && date != null) {
                 repository.addManualHistory(subjectId, date, note)
+                // Remove all previous attendance records for this subject
+                repository.deleteAllAttendanceForSubject(subjectId)
+                // Add new attendance records based on manual values
+                val presentCount = attended
+                val absentCount = total - attended
+                val today = date
+                repeat(presentCount) {
+                    repository.markAttendance(subjectId, today, AttendanceStatus.PRESENT)
+                }
+                repeat(absentCount) {
+                    repository.markAttendance(subjectId, today, AttendanceStatus.ABSENT)
+                }
             }
             loadAttendance(subjectId)
         }

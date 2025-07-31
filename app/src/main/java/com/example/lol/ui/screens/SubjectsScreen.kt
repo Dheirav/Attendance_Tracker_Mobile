@@ -222,13 +222,28 @@ fun SubjectCard(
                     // Display attended and total classes
                     Text("Attended: ${subject.attendedClasses} / Total: ${subject.totalClasses}", style = MaterialTheme.typography.bodySmall)
                 }
-                IconButton(onClick = {
-                    localCoroutineScope.launch {
-                        viewModel.deleteSubject(subject)
-                        onDeleteSuccess("Subject deleted")
-                    }
-                }) {
+                var showDeleteDialog by remember { mutableStateOf(false) }
+                IconButton(onClick = { showDeleteDialog = true }) {
                     Icon(Icons.Default.Delete, contentDescription = "Delete")
+                }
+                if (showDeleteDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showDeleteDialog = false },
+                        title = { Text("Delete Subject") },
+                        text = { Text("Are you sure you want to delete this subject? This action cannot be undone.") },
+                        confirmButton = {
+                            Button(onClick = {
+                                showDeleteDialog = false
+                                localCoroutineScope.launch {
+                                    viewModel.deleteSubject(subject)
+                                    onDeleteSuccess("Subject deleted")
+                                }
+                            }) { Text("Delete") }
+                        },
+                        dismissButton = {
+                            Button(onClick = { showDeleteDialog = false }) { Text("Cancel") }
+                        }
+                    )
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))

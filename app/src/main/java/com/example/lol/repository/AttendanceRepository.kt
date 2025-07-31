@@ -1,4 +1,3 @@
-
 package com.example.lol.repository
 import com.example.lol.data.Attendance
 import com.example.lol.data.AttendanceDao
@@ -10,6 +9,10 @@ class AttendanceRepository(private val attendanceDao: AttendanceDao, private val
     suspend fun markAttendance(subjectId: Int, date: String, status: AttendanceStatus) {
         val attendance = Attendance(subjectId = subjectId, date = date, status = status)
         attendanceDao.insertAttendance(attendance)
+    }
+
+    suspend fun deleteAllAttendanceForSubject(subjectId: Int) {
+        attendanceDao.deleteAllForSubject(subjectId)
     }
 
     suspend fun getSubjectById(subjectId: Int): Subject? {
