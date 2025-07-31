@@ -40,6 +40,7 @@ fun CommonSlotsManagerScreen(
     var label by remember { mutableStateOf("") }
     var startTime by remember { mutableStateOf("") }
     var endTime by remember { mutableStateOf("") }
+    val timeFormatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())
 
     Scaffold(
         topBar = {
@@ -116,14 +117,14 @@ fun CommonSlotsManagerScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("Start Time:")
                         TimePickerDialogSample(
-                            selectedTime = if (startTime.isNotBlank()) LocalTime.parse(startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) else LocalTime.parse("09:00 AM", DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())),
-                            onTimeSelected = { selected: LocalTime -> startTime = selected.format(DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }
+                            selectedTime = if (startTime.isNotBlank()) LocalTime.parse(startTime, timeFormatter) else LocalTime.parse("09:00 AM", timeFormatter),
+                            onTimeSelected = { selected: LocalTime -> startTime = selected.format(timeFormatter) }
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("End Time:")
                         TimePickerDialogSample(
-                            selectedTime = if (endTime.isNotBlank()) LocalTime.parse(endTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) else LocalTime.parse("10:00 AM", DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())),
-                            onTimeSelected = { selected: LocalTime -> endTime = selected.format(DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }
+                            selectedTime = if (endTime.isNotBlank()) LocalTime.parse(endTime, timeFormatter) else LocalTime.parse("10:00 AM", timeFormatter),
+                            onTimeSelected = { selected: LocalTime -> endTime = selected.format(timeFormatter) }
                         )
                     }
                 },
@@ -161,14 +162,14 @@ fun CommonSlotsManagerScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("Start Time:")
                         TimePickerDialogSample(
-                            selectedTime = if (startTime.isNotBlank()) LocalTime.parse(startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) else LocalTime.parse("09:00 AM", DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())),
-                            onTimeSelected = { selected -> startTime = selected.format(DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }
+                            selectedTime = if (startTime.isNotBlank()) LocalTime.parse(startTime, timeFormatter) else LocalTime.parse("09:00 AM", timeFormatter),
+                            onTimeSelected = { selected -> startTime = selected.format(timeFormatter) }
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text("End Time:")
                         TimePickerDialogSample(
-                            selectedTime = if (endTime.isNotBlank()) LocalTime.parse(endTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) else LocalTime.parse("10:00 AM", DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())),
-                            onTimeSelected = { selected -> endTime = selected.format(DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }
+                            selectedTime = if (endTime.isNotBlank()) LocalTime.parse(endTime, timeFormatter) else LocalTime.parse("10:00 AM", timeFormatter),
+                            onTimeSelected = { selected -> endTime = selected.format(timeFormatter) }
                         )
                     }
                 },

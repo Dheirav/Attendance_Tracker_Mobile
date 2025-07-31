@@ -22,6 +22,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
+import com.example.lol.ui.components.CustomDismissValue
+import java.time.format.DateTimeParseException
 import kotlinx.coroutines.launch
 import com.example.lol.viewmodel.TimetableViewModel
 import com.example.lol.data.TimetableEntry
@@ -39,6 +41,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Arrangement
 import com.example.lol.ui.components.*
 
+// Define a single DateTimeFormatter instance for reuse
+val timeFormatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.US)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -47,7 +52,7 @@ fun HomeScreen(
     commonSlotViewModel: CommonSlotViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     attendanceViewModel: AttendanceViewModel 
 ) {
-    val today = LocalDate.now().dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
+    val today = LocalDate.now().dayOfWeek.getDisplayName(TextStyle.FULL, Locale.US)
     val timetableEntries by timetableViewModel.getEntriesForDay(today).collectAsState()
     var showDialog by remember { mutableStateOf(false) }
     var editingEntry by remember { mutableStateOf<TimetableEntry?>(null) }
@@ -61,7 +66,7 @@ fun HomeScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
     val todayDate = LocalDate.now()
-    val dayOfWeek = todayDate.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
+    val dayOfWeek = todayDate.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.US)
     val dateStr = todayDate.format(java.time.format.DateTimeFormatter.ofPattern("dd MMMM yyyy"))
 
     LaunchedEffect(errorMessage) {
@@ -110,8 +115,8 @@ fun HomeScreen(
                     timetableEntries.forEach { entry ->
                         // Find the slot(s) for this entry
                         val entrySlots = slotEntities.filter {
-                            LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) >= LocalTime.parse(entry.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) &&
-                            LocalTime.parse(it.endTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) <= LocalTime.parse(entry.endTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault()))
+                            (safeParseTime(it.startTime) ?: LocalTime.MIN) >= (safeParseTime(entry.startTime) ?: LocalTime.MIN) &&
+                            (safeParseTime(it.endTime) ?: LocalTime.MAX) <= (safeParseTime(entry.endTime) ?: LocalTime.MAX)
                         }
                         val selectedSlots: List<Int> = entrySlots.map { it.id }
                         val dismissState = rememberCustomDismissState()
@@ -248,7 +253,7 @@ fun HomeScreen(
                             }
                             coroutineScope.launch {
                                 val selectedSlots = slotEntities.filter { selectedSlotIds.contains(it.id) }
-                                    .sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }
+                                    .sortedBy { LocalTime.parse(it.startTime, timeFormatter) }
                                 val startStr = selectedSlots.first().startTime
                                 val endStr = selectedSlots.last().endTime
                                 if (editingEntry == null) {
@@ -301,7 +306,7 @@ fun HomeScreen(
                                     readOnly = true,
                                     label = { Text("Subject") },
                                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = subjectDropdownExpanded) },
-                                    modifier = Modifier.menuAnchor()
+                                    modifier = Modifier
                                 )
                                 ExposedDropdownMenu(
                                     expanded = subjectDropdownExpanded,
@@ -322,17 +327,17 @@ fun HomeScreen(
                             Text("Select Time Slots (≤20 min gap):")
                             Box(modifier = Modifier.height(220.dp)) {
                                 LazyColumn {
-                                    items(slotEntities.sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }) { slot ->
+                                    items(slotEntities.sortedBy { LocalTime.parse(it.startTime, timeFormatter) }) { slot ->
                                         val checked = selectedSlotIds.contains(slot.id)
                                         Button(
                                             onClick = {
                                                 if (!checked) {
                                                     val allSelected = selectedSlotIds + slot.id
                                                     val sortedSlots = slotEntities.filter { allSelected.contains(it.id) }
-                                                        .sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }
+                                                        .sortedBy { LocalTime.parse(it.startTime, timeFormatter) }
                                                     val valid = sortedSlots.zipWithNext().all { (a, b) ->
-                                                        val aEnd = LocalTime.parse(a.endTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault()))
-                                                        val bStart = LocalTime.parse(b.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault()))
+                                                        val aEnd = LocalTime.parse(a.endTime, timeFormatter)
+                                                        val bStart = LocalTime.parse(b.startTime, timeFormatter)
                                                         java.time.Duration.between(aEnd, bStart).toMinutes() <= 20
                                                     }
                                                     if (valid) {
@@ -367,5 +372,29 @@ fun HomeScreen(
                 )
             }
         }
+    }
+}
+
+// Update LocalTime.parse calls to trim input strings and handle errors
+val safeParseTime: (String) -> LocalTime? = { timeString ->
+    try {
+        val trimmedTime = timeString.trim()
+        println("Parsing time: '$trimmedTime'") // Debugging log
+        LocalTime.parse(trimmedTime, timeFormatter)
+    } catch (e: DateTimeParseException) {
+        println("Failed to parse time: '${timeString.trim()}' - ${e.message}") // Debugging log
+        null
+    }
+}
+
+// Enhanced time parsing with fallback and added debugging logs
+fun parseTimeWithFallback(timeString: String, defaultHour: Int, defaultMinute: Int): LocalTime {
+    return try {
+        val trimmedTime = timeString.trim()
+        println("Parsing time with fallback: '$trimmedTime'") // Debugging log
+        LocalTime.parse(trimmedTime, timeFormatter)
+    } catch (e: Exception) {
+        println("Failed to parse time with fallback: '$timeString' - ${e.message}") // Debugging log
+        LocalTime.of(defaultHour, defaultMinute)
     }
 }

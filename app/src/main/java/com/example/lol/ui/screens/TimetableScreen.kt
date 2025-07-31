@@ -43,15 +43,15 @@ fun TimetableScreen(
     subjectRepository: SubjectRepository,
     commonSlotViewModel: CommonSlotViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
-    val daysOfWeek = DayOfWeek.values().map { it.getDisplayName(TextStyle.FULL, Locale.getDefault()) }
+    val daysOfWeek = DayOfWeek.values().map { it.getDisplayName(TextStyle.FULL, Locale.US) }
     var selectedDay by remember { mutableStateOf(daysOfWeek[0]) }
     val timetableEntries by timetableViewModel.getEntriesForDay(selectedDay).collectAsState()
     var showDialog by remember { mutableStateOf(false) }
     var editingEntry by remember { mutableStateOf<TimetableEntry?>(null) }
     var subject by remember { mutableStateOf("") } 
     val subjects by subjectRepository.allSubjects.collectAsState(initial = emptyList())
-    var startTime by remember { mutableStateOf(LocalTime.parse("09:00 AM", DateTimeFormatter.ofPattern("hh:mm a"))) }
-    var endTime by remember { mutableStateOf(LocalTime.parse("10:00 AM", DateTimeFormatter.ofPattern("hh:mm a"))) }
+    var startTime by remember { mutableStateOf(LocalTime.parse("09:00 AM", DateTimeFormatter.ofPattern("hh:mm a", Locale.US))) }
+    var endTime by remember { mutableStateOf(LocalTime.parse("10:00 AM", DateTimeFormatter.ofPattern("hh:mm a", Locale.US))) }
     val snackbarHostState = remember { SnackbarHostState() }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
@@ -72,8 +72,8 @@ fun TimetableScreen(
                     IconButton(onClick = {
                         editingEntry = null
                         subject = ""
-                        startTime = LocalTime.parse("09:00 AM", DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault()))
-                        endTime = LocalTime.parse("10:00 AM", DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault()))
+                        startTime = LocalTime.parse("09:00 AM", DateTimeFormatter.ofPattern("hh:mm a", Locale.US))
+                        endTime = LocalTime.parse("10:00 AM", DateTimeFormatter.ofPattern("hh:mm a", Locale.US))
                         showDialog = true
                     }) {
                         Icon(Icons.Filled.Add, contentDescription = "Add Timetable Entry")
@@ -108,8 +108,23 @@ fun TimetableScreen(
                                 IconButton(onClick = {
                                     editingEntry = entry
                                     subject = entry.subject
-                                    startTime = try { LocalTime.parse(entry.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) } catch (e: Exception) { LocalTime.parse("09:00 AM", DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }
-                                    endTime = try { LocalTime.parse(entry.endTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) } catch (e: Exception) { LocalTime.parse("10:00 AM", DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }
+                                    // Enhanced time parsing with fallback and added debugging logs
+                                    startTime = try {
+                                        val parsedTime = LocalTime.parse(entry.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.US))
+                                        println("Parsed start time: $parsedTime") // Debugging log
+                                        parsedTime
+                                    } catch (e: Exception) {
+                                        println("Failed to parse start time: '${entry.startTime}' - ${e.message}") // Debugging log
+                                        LocalTime.of(9, 0) // Default to 09:00 AM
+                                    }
+                                    endTime = try {
+                                        val parsedTime = LocalTime.parse(entry.endTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.US))
+                                        println("Parsed end time: $parsedTime") // Debugging log
+                                        parsedTime
+                                    } catch (e: Exception) {
+                                        println("Failed to parse end time: '${entry.endTime}' - ${e.message}") // Debugging log
+                                        LocalTime.of(10, 0) // Default to 10:00 AM
+                                    }
                                     showDialog = true
                                 }) {
                                     Icon(Icons.Filled.Edit, contentDescription = "Edit")
@@ -145,7 +160,7 @@ fun TimetableScreen(
                             }
                             coroutineScope.launch {
                                 val selectedSlots = slotEntities.filter { selectedSlotIds.contains(it.id) }
-                                    .sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }
+                                    .sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.US)) }
                                 val startStr = selectedSlots.first().startTime
                                 val endStr = selectedSlots.last().endTime
                                 if (editingEntry == null) {
@@ -219,17 +234,17 @@ fun TimetableScreen(
                             Text("Select Time Slots (≤20 min gap):")
                             Box(modifier = Modifier.height(220.dp)) {
                                 LazyColumn {
-                                    items(slotEntities.sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }) { slot ->
+                                    items(slotEntities.sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.US)) }) { slot ->
                                         val checked = selectedSlotIds.contains(slot.id)
                                         Button(
                                             onClick = {
                                                 if (!checked) {
                                                     val allSelected = selectedSlotIds + slot.id
                                                     val sortedSlots = slotEntities.filter { allSelected.contains(it.id) }
-                                                        .sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())) }
+                                                        .sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.US)) }
                                                     val valid = sortedSlots.zipWithNext().all { (a, b) ->
-                                                        val aEnd = LocalTime.parse(a.endTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault()))
-                                                        val bStart = LocalTime.parse(b.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault()))
+                                                        val aEnd = LocalTime.parse(a.endTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.US))
+                                                        val bStart = LocalTime.parse(b.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.US))
                                                         java.time.Duration.between(aEnd, bStart).toMinutes() <= 20
                                                     }
                                                     if (valid) {
@@ -286,7 +301,7 @@ fun TimePickerDialogSample(
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = time.value.format(java.time.format.DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())),
+            text = time.value.format(java.time.format.DateTimeFormatter.ofPattern("hh:mm a", Locale.US)),
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant

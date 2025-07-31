@@ -25,6 +25,7 @@ import com.example.lol.viewmodel.AttendanceViewModelFactory
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,7 +45,8 @@ fun SubjectsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
-    val today = LocalDate.now().format(DateTimeFormatter.ofPattern("dd-MM-yyyy"))
+    val dateFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy", Locale.getDefault())
+    val today = LocalDate.now().format(dateFormatter)
 
     LaunchedEffect(errorMessage) {
         errorMessage?.let {
