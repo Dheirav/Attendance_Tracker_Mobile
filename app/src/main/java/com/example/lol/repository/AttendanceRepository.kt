@@ -2,10 +2,15 @@ package com.example.lol.repository
 import com.example.lol.data.Attendance
 import com.example.lol.data.AttendanceDao
 import com.example.lol.data.AttendanceStatus
+import com.example.lol.data.SubjectRepository
 import com.example.lol.data.SubjectDao
 import com.example.lol.data.Subject
 
-class AttendanceRepository(private val attendanceDao: AttendanceDao, private val subjectDao: SubjectDao) {
+class AttendanceRepository(
+    private val attendanceDao: AttendanceDao,
+    private val subjectDao: SubjectDao,
+    private val subjectRepository: SubjectRepository // Injected shared instance
+) {
     suspend fun markAttendanceForSlot(subjectId: Int, slotId: Int, date: String, status: AttendanceStatus) {
         val attendance = Attendance(subjectId = subjectId, slotId = slotId, date = date, status = status)
         attendanceDao.insertAttendance(attendance)
@@ -29,6 +34,8 @@ class AttendanceRepository(private val attendanceDao: AttendanceDao, private val
         if (subject != null) {
             val updated = subject.copy(attendedClasses = attended, totalClasses = total)
             subjectDao.updateSubject(updated)
+            // Notify shared SubjectRepository to refresh subjects
+            subjectRepository.refreshSubjects()
         }
     }
 

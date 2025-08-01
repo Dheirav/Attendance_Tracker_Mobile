@@ -16,4 +16,8 @@ class SubjectRepository(private val subjectDao: SubjectDao) {
     suspend fun update(subject: Subject) {
         subjectDao.updateSubject(subject)
     }
+
+    suspend fun refreshSubjects() {
+        subjectDao.getAllSubjects()
+    }
 }

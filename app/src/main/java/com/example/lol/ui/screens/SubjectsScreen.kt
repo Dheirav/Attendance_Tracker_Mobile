@@ -89,6 +89,7 @@ fun SubjectsScreen(
                             viewModel = viewModel,
                             attendanceViewModel = attendanceViewModel,
                             today = today,
+                            attendanceHistory = attendanceViewModel.attendanceHistory.collectAsState().value,
                             onEdit = {
                                 editingSubject = subject
                                 showDialog = true
@@ -197,12 +198,16 @@ fun SubjectCard(
     viewModel: SubjectViewModel,
     attendanceViewModel: AttendanceViewModel,
     today: String,
+    attendanceHistory: List<Attendance>, // Explicitly typed
     onEdit: () -> Unit,
     onDeleteSuccess: (String) -> Unit,
     onEditAttendance: () -> Unit
 ) {
-    val attendanceHistory by attendanceViewModel.attendanceHistory.collectAsState()
-    val attendancePercentage by attendanceViewModel.attendancePercentage.collectAsState()
+    val attendancePercentage = if (subject.totalClasses > 0) {
+        subject.attendedClasses * 100.0 / subject.totalClasses
+    } else {
+        0.0
+    }
     val localCoroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(subject.id) {
@@ -222,9 +227,8 @@ fun SubjectCard(
                     Text(subject.name, style = MaterialTheme.typography.titleMedium)
                     Text(subject.type, style = MaterialTheme.typography.bodyMedium)
                     Text("Threshold: ${subject.threshold}%", style = MaterialTheme.typography.bodySmall)
-                    // Display attended and total classes
                     Text("Attended: ${subject.attendedClasses} / Total: ${subject.totalClasses}", style = MaterialTheme.typography.bodySmall)
-                    // --- Attendance Progress Bar ---
+
                     val attended = subject.attendedClasses
                     val total = subject.totalClasses
                     val threshold = subject.threshold
@@ -232,7 +236,6 @@ fun SubjectCard(
                     val thresholdPercent = threshold
                     Spacer(modifier = Modifier.height(8.dp))
                     Box(modifier = Modifier.fillMaxWidth().height(20.dp)) {
-                        // Custom left-to-right progress bars
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()

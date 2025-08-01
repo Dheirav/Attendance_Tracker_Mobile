@@ -306,7 +306,7 @@ fun HomeScreen(
                                     readOnly = true,
                                     label = { Text("Subject") },
                                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = subjectDropdownExpanded) },
-                                    modifier = Modifier
+                                    modifier = Modifier.menuAnchor()
                                 )
                                 ExposedDropdownMenu(
                                     expanded = subjectDropdownExpanded,
