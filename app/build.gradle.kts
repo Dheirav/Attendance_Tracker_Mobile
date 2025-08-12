@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.lol"
+    namespace = "com.example.attendance_tracker"
     compileSdk = 36
 
     defaultConfig {
