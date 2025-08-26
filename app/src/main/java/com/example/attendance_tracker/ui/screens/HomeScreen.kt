@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -39,6 +40,8 @@ import java.time.format.DateTimeFormatter
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import com.example.attendance_tracker.ui.components.*
 
 // Define a single DateTimeFormatter instance for reuse
@@ -68,13 +71,6 @@ fun HomeScreen(
     val todayDate = LocalDate.now()
     val dayOfWeek = todayDate.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.US)
     val dateStr = todayDate.format(java.time.format.DateTimeFormatter.ofPattern("dd MMMM yyyy"))
-
-    LaunchedEffect(errorMessage) {
-        errorMessage?.let {
-            snackbarHostState.showSnackbar(it)
-            errorMessage = null
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -262,6 +258,11 @@ fun HomeScreen(
                 val selectedSlotIds = remember { mutableStateListOf<Int>() }
                 var slotSelectionError by remember { mutableStateOf<String?>(null) }
 
+                // Reset errorMessage when subject or slot selection changes
+                LaunchedEffect(selectedSubject, selectedSlotIds) {
+                    errorMessage = null
+                }
+
                 AlertDialog(
                     onDismissRequest = { showDialog = false },
                     confirmButton = {
@@ -270,9 +271,23 @@ fun HomeScreen(
                                 errorMessage = slotSelectionError ?: "Please select subject and valid slots."
                                 return@Button
                             }
+                            val selectedSlots = slotEntities.filter { selectedSlotIds.contains(it.id) }
+                                .sortedBy { LocalTime.parse(it.startTime, timeFormatter) }
+                            val newStart = LocalTime.parse(selectedSlots.first().startTime, timeFormatter)
+                            val newEnd = LocalTime.parse(selectedSlots.last().endTime, timeFormatter)
+                            val conflict = timetableEntries.any { entry ->
+                                if (editingEntry != null && entry.id == editingEntry!!.id) return@any false // skip self when editing
+                                val entryStart = LocalTime.parse(entry.startTime, timeFormatter)
+                                val entryEnd = LocalTime.parse(entry.endTime, timeFormatter)
+                                val timeOverlap = newStart < entryEnd && newEnd > entryStart
+                                val slotOverlap = entry.slotIds.any { selectedSlotIds.contains(it) }
+                                timeOverlap || slotOverlap
+                            }
+                            if (conflict) {
+                                errorMessage = "Conflict: Overlapping time or duplicate slot with another entry."
+                                return@Button
+                            }
                             coroutineScope.launch {
-                                val selectedSlots = slotEntities.filter { selectedSlotIds.contains(it.id) }
-                                    .sortedBy { LocalTime.parse(it.startTime, timeFormatter) }
                                 val startStr = selectedSlots.first().startTime
                                 val endStr = selectedSlots.last().endTime
                                 if (editingEntry == null) {
@@ -385,6 +400,38 @@ fun HomeScreen(
                             }
                             if (slotSelectionError != null) {
                                 Text(slotSelectionError!!, color = MaterialTheme.colorScheme.error)
+                            }
+                            if (!errorMessage.isNullOrBlank()) {
+                                LaunchedEffect(errorMessage) {
+                                    errorMessage?.let {
+                                        snackbarHostState.showSnackbar(it)
+                                    }
+                                }
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp)
+                                        .background(
+                                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
+                                            shape = MaterialTheme.shapes.medium
+                                        )
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Error,
+                                        contentDescription = "Error",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = errorMessage!!,
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
                             }
                         }
                     }

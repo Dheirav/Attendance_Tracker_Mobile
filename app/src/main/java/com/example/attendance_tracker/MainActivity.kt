@@ -57,7 +57,7 @@ class MainActivity : ComponentActivity() {
                 val commonSlotViewModel: com.example.attendance_tracker.viewmodel.CommonSlotViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
                 // Always call insertDefaultSlotsIfEmpty; it only inserts if table is empty
                 commonSlotViewModel.insertDefaultSlotsIfEmpty()
-                val attendanceRepository = remember { com.example.attendance_tracker.repository.AttendanceRepository(db.attendanceDao(), db.subjectDao(), repository) }
+                val attendanceRepository = remember { com.example.attendance_tracker.repository.AttendanceRepository(db.attendanceDao(), db.subjectDao(), repository, timetableRepository) }
                 val attendanceViewModel = remember { com.example.attendance_tracker.viewmodel.AttendanceViewModel(attendanceRepository) }
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),

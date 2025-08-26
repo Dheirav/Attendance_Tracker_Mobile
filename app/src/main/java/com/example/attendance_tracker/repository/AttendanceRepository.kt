@@ -5,11 +5,13 @@ import com.example.attendance_tracker.data.AttendanceStatus
 import com.example.attendance_tracker.data.SubjectRepository
 import com.example.attendance_tracker.data.SubjectDao
 import com.example.attendance_tracker.data.Subject
+import kotlinx.coroutines.flow.first
 
 class AttendanceRepository(
     private val attendanceDao: AttendanceDao,
     private val subjectDao: SubjectDao,
-    private val subjectRepository: SubjectRepository // Injected shared instance
+    private val subjectRepository: SubjectRepository,
+    private val timetableRepository: TimetableRepository // Injected shared instance
 ) {
     suspend fun markAttendanceForSlot(subjectId: Int, slotId: Int, date: String, status: AttendanceStatus) {
         val attendance = Attendance(subjectId = subjectId, slotId = slotId, date = date, status = status)
@@ -59,12 +61,20 @@ class AttendanceRepository(
         if (attendance != null) {
             val subject = subjectDao.getSubjectById(subjectId)
             if (subject != null) {
+                // Get day of week from date string
+                val dayOfWeek = try {
+                    java.time.LocalDate.parse(date).dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.US)
+                } catch (e: Exception) { "" }
+                // Get timetable entries for this day
+                val timetableEntries = timetableRepository.getEntriesForDay(dayOfWeek).first()
+                val entry = timetableEntries.firstOrNull { it.subject == subject.name }
+                val slotCount = entry?.slotIds?.size ?: 1
                 var attended = subject.attendedClasses
                 // Adjust attended count based on status change
                 if (attendance.status == AttendanceStatus.PRESENT && status == AttendanceStatus.ABSENT) {
-                    attended = (attended - 1).coerceAtLeast(0)
+                    attended = (attended - slotCount).coerceAtLeast(0)
                 } else if (attendance.status == AttendanceStatus.ABSENT && status == AttendanceStatus.PRESENT) {
-                    attended = attended + 1
+                    attended = attended + slotCount
                 }
                 subjectDao.updateSubject(subject.copy(attendedClasses = attended))
             }

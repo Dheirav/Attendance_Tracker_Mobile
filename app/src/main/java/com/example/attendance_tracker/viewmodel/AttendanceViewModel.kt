@@ -25,15 +25,16 @@ class AttendanceViewModel(val repository: AttendanceRepository) : ViewModel() {
 
     fun markAttendance(subjectId: Int, selectedSlots: List<Int>, date: String, status: AttendanceStatus) {
         viewModelScope.launch {
-            for (slotId in selectedSlots) {
+            // Mark attendance for all slots, but only update attended/total once per subject per day
+            selectedSlots.forEach { slotId ->
                 repository.markAttendanceForSlot(subjectId, slotId, date, status)
-                // Update attended/total classes in Subject
-                val subject = repository.getSubjectById(subjectId)
-                if (subject != null) {
-                    val attended = subject.attendedClasses + if (status == AttendanceStatus.PRESENT) 1 else 0
-                    val total = subject.totalClasses + 1
-                    repository.updateSubjectAttendance(subjectId, attended, total)
-                }
+            }
+            val subject = repository.getSubjectById(subjectId)
+            if (subject != null) {
+                val slotCount = selectedSlots.size
+                val attended = subject.attendedClasses + if (status == AttendanceStatus.PRESENT) slotCount else 0
+                val total = subject.totalClasses + slotCount
+                repository.updateSubjectAttendance(subjectId, attended, total)
             }
             loadAttendance(subjectId)
         }

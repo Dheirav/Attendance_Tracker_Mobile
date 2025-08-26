@@ -6,6 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -143,13 +144,33 @@ fun TimetableScreen(
                 var selectedSubject by remember { mutableStateOf(subjectOptions.firstOrNull() ?: "") }
                 val selectedSlotIds = remember { mutableStateListOf<Int>() }
                 var slotSelectionError by remember { mutableStateOf<String?>(null) }
-            
+                var dialogErrorMessage by remember { mutableStateOf<String?>(null) }
+
                 AlertDialog(
                     onDismissRequest = { showDialog = false },
                     confirmButton = {
                         Button(onClick = {
                             if (selectedSubject.isBlank() || selectedSlotIds.isEmpty() || slotSelectionError != null) {
-                                errorMessage = slotSelectionError ?: "Please select subject and valid slots."
+                                dialogErrorMessage = slotSelectionError ?: "Please select subject and valid slots."
+                                return@Button
+                            }
+                            // Build selectedSlots from slotEntities and selectedSlotIds
+                            val selectedSlots = slotEntities.filter { selectedSlotIds.contains(it.id) }
+                                .sortedBy { LocalTime.parse(it.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.US)) }
+                            val newStart = LocalTime.parse(selectedSlots.first().startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.US))
+                            val newEnd = LocalTime.parse(selectedSlots.last().endTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.US))
+                            val conflict = timetableEntries.any { entry ->
+                                if (editingEntry != null && entry.id == editingEntry!!.id) return@any false // skip self when editing
+                                val entryStart = LocalTime.parse(entry.startTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.US))
+                                val entryEnd = LocalTime.parse(entry.endTime, DateTimeFormatter.ofPattern("hh:mm a", Locale.US))
+                                // Overlapping time check
+                                val timeOverlap = newStart < entryEnd && newEnd > entryStart
+                                // Duplicate slot check
+                                val slotOverlap = entry.slotIds.any { selectedSlotIds.contains(it) }
+                                timeOverlap || slotOverlap
+                            }
+                            if (conflict) {
+                                dialogErrorMessage = "Conflict: Overlapping time or duplicate slot with another entry."
                                 return@Button
                             }
                             coroutineScope.launch {
@@ -267,6 +288,33 @@ fun TimetableScreen(
                             }
                             if (slotSelectionError != null) {
                                 Text(slotSelectionError!!, color = MaterialTheme.colorScheme.error)
+                            }
+                            if (!dialogErrorMessage.isNullOrBlank()) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp)
+                                        .background(
+                                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
+                                            shape = MaterialTheme.shapes.medium
+                                        )
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Error,
+                                        contentDescription = "Error",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = dialogErrorMessage!!,
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
                             }
                         }
                     }
