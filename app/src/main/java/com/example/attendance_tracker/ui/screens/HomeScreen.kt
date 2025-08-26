@@ -111,8 +111,8 @@ fun HomeScreen(
                     Text("No timetable entries for today.")
                 }
             } else {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    timetableEntries.forEach { entry ->
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    items(timetableEntries) { entry ->
                         // Find the slot(s) for this entry
                         val entrySlots = slotEntities.filter {
                             (safeParseTime(it.startTime) ?: LocalTime.MIN) >= (safeParseTime(entry.startTime) ?: LocalTime.MIN) &&
@@ -123,22 +123,27 @@ fun HomeScreen(
                         if (dismissState.value == CustomDismissValue.DismissedToEnd || dismissState.value == CustomDismissValue.DismissedToStart) {
                             val subjectId = subjects.find { it.name == entry.subject }?.id ?: 0
                             coroutineScope.launch {
-                                if (dismissState.value == CustomDismissValue.DismissedToEnd) {
+                                val attendance = attendanceViewModel.getAttendanceStatusForSubjectOnDate(subjectId, todayDate.toString())
+                                if (attendance == null) {
+                                    // No record yet, insert new
                                     attendanceViewModel.markAttendance(
                                         subjectId = subjectId,
                                         selectedSlots = selectedSlots,
                                         date = todayDate.toString(),
-                                        status = AttendanceStatus.PRESENT
+                                        status = if (dismissState.value == CustomDismissValue.DismissedToEnd) AttendanceStatus.PRESENT else AttendanceStatus.ABSENT
                                     )
-                                    errorMessage = "Marked Present for ${entry.subject}"
-                                } else if (dismissState.value == CustomDismissValue.DismissedToStart) {
-                                    attendanceViewModel.markAttendance(
-                                        subjectId = subjectId,
-                                        selectedSlots = selectedSlots,
-                                        date = todayDate.toString(),
-                                        status = AttendanceStatus.ABSENT
+                                } else {
+                                    // Record exists, update status
+                                    attendanceViewModel.updateAttendanceStatusForSubjectOnDate(
+                                        subjectId,
+                                        todayDate.toString(),
+                                        if (dismissState.value == CustomDismissValue.DismissedToEnd) AttendanceStatus.PRESENT else AttendanceStatus.ABSENT
                                     )
-                                    errorMessage = "Marked Absent for ${entry.subject}"
+                                }
+                                errorMessage = if (dismissState.value == CustomDismissValue.DismissedToEnd) {
+                                    "Marked Present for ${entry.subject}"
+                                } else {
+                                    "Marked Absent for ${entry.subject}"
                                 }
                                 dismissState.value = CustomDismissValue.Default
                             }
@@ -157,11 +162,25 @@ fun HomeScreen(
                                 )
                             },
                             content = {
+                                val subjectId = subjects.find { it.name == entry.subject }?.id
+                                val attendanceStatus by produceState<AttendanceStatus?>(null, subjectId, todayDate) {
+                                    value = if (subjectId != null) {
+                                        attendanceViewModel.getAttendanceStatusForSubjectOnDate(subjectId, todayDate.toString())
+                                    } else null
+                                }
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(8.dp),
-                                    elevation = CardDefaults.cardElevation(2.dp)
+                                    elevation = CardDefaults.cardElevation(2.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = when (attendanceStatus) {
+                                            AttendanceStatus.PRESENT -> Color(0xFFA5D6A7)
+                                            AttendanceStatus.ABSENT -> Color(0xFFEF9A9A)
+                                            null -> MaterialTheme.colorScheme.surface
+                                            else -> MaterialTheme.colorScheme.surface
+                                        }
+                                    )
                                 ) {
                                     Column(
                                         modifier = Modifier

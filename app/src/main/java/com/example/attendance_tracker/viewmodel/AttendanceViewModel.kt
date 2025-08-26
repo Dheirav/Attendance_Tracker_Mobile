@@ -60,4 +60,17 @@ class AttendanceViewModel(val repository: AttendanceRepository) : ViewModel() {
             loadAttendance(subjectId)
         }
     }
+
+    suspend fun getAttendanceStatusForSubjectOnDate(subjectId: Int, date: String): AttendanceStatus? {
+        val attendance = repository.getAttendanceForDate(subjectId, date)
+        return attendance?.status
+    }
+
+    suspend fun updateAttendanceStatusForSubjectOnDate(subjectId: Int, date: String, status: AttendanceStatus) {
+        repository.updateAttendanceStatusForSubjectOnDate(subjectId, date, status)
+    }
+
+    suspend fun deleteAttendanceForSubjectOnDate(subjectId: Int, date: String) {
+        repository.deleteAttendanceForSubjectOnDate(subjectId, date)
+    }
 }

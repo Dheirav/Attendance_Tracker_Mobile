@@ -27,4 +27,10 @@ interface AttendanceDao {
 
     @Query("SELECT COUNT(*) FROM attendance WHERE subjectId = :subjectId")
     suspend fun getTotalMarked(subjectId: Int): Int
+
+    @Query("DELETE FROM attendance WHERE subjectId = :subjectId AND date = :date")
+    suspend fun deleteAttendanceForSubjectOnDate(subjectId: Int, date: String)
+
+    @Query("UPDATE attendance SET status = :status WHERE subjectId = :subjectId AND date = :date")
+    suspend fun updateAttendanceStatusForSubjectOnDate(subjectId: Int, date: String, status: AttendanceStatus)
 }

@@ -49,4 +49,26 @@ class AttendanceRepository(
         val present = attendanceDao.getCountByStatus(subjectId, AttendanceStatus.PRESENT)
         return (present.toDouble() / total) * 100
     }
+
+    suspend fun deleteAttendanceForSubjectOnDate(subjectId: Int, date: String) {
+        attendanceDao.deleteAttendanceForSubjectOnDate(subjectId, date)
+    }
+
+    suspend fun updateAttendanceStatusForSubjectOnDate(subjectId: Int, date: String, status: AttendanceStatus) {
+        val attendance = getAttendanceForDate(subjectId, date)
+        if (attendance != null) {
+            val subject = subjectDao.getSubjectById(subjectId)
+            if (subject != null) {
+                var attended = subject.attendedClasses
+                // Adjust attended count based on status change
+                if (attendance.status == AttendanceStatus.PRESENT && status == AttendanceStatus.ABSENT) {
+                    attended = (attended - 1).coerceAtLeast(0)
+                } else if (attendance.status == AttendanceStatus.ABSENT && status == AttendanceStatus.PRESENT) {
+                    attended = attended + 1
+                }
+                subjectDao.updateSubject(subject.copy(attendedClasses = attended))
+            }
+            attendanceDao.updateAttendanceStatusForSubjectOnDate(subjectId, date, status)
+        }
+    }
 }
