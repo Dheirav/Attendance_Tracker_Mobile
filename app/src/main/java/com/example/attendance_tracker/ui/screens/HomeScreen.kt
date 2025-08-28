@@ -116,9 +116,20 @@ fun HomeScreen(
                         }
                         val selectedSlots: List<Int> = entrySlots.map { it.id }
                         val dismissState = rememberCustomDismissState()
+                        // Overlap prevention logic
+                        val isOverlapping = slotEntities.any { slot ->
+                            slot.id != entry.id &&
+                            (safeParseTime(slot.startTime)?.isBefore(safeParseTime(entry.endTime)) == true &&
+                             safeParseTime(slot.endTime)?.isAfter(safeParseTime(entry.startTime)) == true)
+                        }
+                        if (isOverlapping) {
+                            errorMessage = "Time slot overlaps with another entry!"
+                        } else {
+                            errorMessage = null
+                        }
                         if (dismissState.value == CustomDismissValue.DismissedToEnd || dismissState.value == CustomDismissValue.DismissedToStart) {
                             val subjectId = subjects.find { it.name == entry.subject }?.id ?: 0
-                            coroutineScope.launch {
+                            LaunchedEffect(dismissState.value) {
                                 val attendance = attendanceViewModel.getAttendanceStatusForSubjectOnDate(subjectId, todayDate.toString())
                                 if (attendance == null) {
                                     // No record yet, insert new
@@ -403,9 +414,6 @@ fun HomeScreen(
                             }
                             if (!errorMessage.isNullOrBlank()) {
                                 LaunchedEffect(errorMessage) {
-                                    errorMessage?.let {
-                                        snackbarHostState.showSnackbar(it)
-                                    }
                                 }
                                 Row(
                                     modifier = Modifier
