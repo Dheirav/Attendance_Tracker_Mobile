@@ -170,11 +170,9 @@ fun HomeScreen(
                             },
                             content = {
                                 val subjectId = subjects.find { it.name == entry.subject }?.id
-                                val attendanceStatus by produceState<AttendanceStatus?>(null, subjectId, todayDate) {
-                                    value = if (subjectId != null) {
-                                        attendanceViewModel.getAttendanceStatusForSubjectOnDate(subjectId, todayDate.toString())
-                                    } else null
-                                }
+                                // Use attendance status as a State from ViewModel for instant updates
+                                val attendanceStatusState = attendanceViewModel.getAttendanceStatusFlow(subjectId, todayDate.toString()).collectAsState(initial = null)
+                                val attendanceStatus = attendanceStatusState.value
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()

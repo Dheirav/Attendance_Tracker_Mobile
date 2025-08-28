@@ -1,5 +1,9 @@
 package com.example.attendance_tracker.ui.screens
 
+import android.graphics.Paint
+import android.graphics.pdf.PdfDocument
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,6 +15,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.foundation.background
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -25,6 +30,9 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import org.apache.poi.xssf.usermodel.XSSFWorkbook
+import org.apache.poi.ss.usermodel.CellType
+import org.apache.poi.ss.usermodel.Row
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,6 +65,46 @@ fun SubjectsScreen(
         }
     }
 
+    // Export state
+    var showExportDialog by remember { mutableStateOf(false) }
+    var selectedExportType by remember { mutableStateOf("CSV") }
+    val exportTypes = listOf("CSV", "Excel", "PDF")
+
+    // Export launchers
+    val exportCsvLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv"),
+        onResult = { uri: android.net.Uri? ->
+            if (uri != null) {
+                coroutineScope.launch {
+                    val csv = buildCsv(filteredSubjects)
+                    context.contentResolver.openOutputStream(uri)?.use { it.write(csv.toByteArray()) }
+                }
+            }
+        }
+    )
+    val exportExcelLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+        onResult = { uri: android.net.Uri? ->
+            if (uri != null) {
+                coroutineScope.launch {
+                    val excelBytes = buildExcel(filteredSubjects)
+                    context.contentResolver.openOutputStream(uri)?.use { it.write(excelBytes) }
+                }
+            }
+        }
+    )
+    val exportPdfLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/pdf"),
+        onResult = { uri: android.net.Uri? ->
+            if (uri != null) {
+                coroutineScope.launch {
+                    val pdfBytes = buildPdf(filteredSubjects)
+                    context.contentResolver.openOutputStream(uri)?.use { it.write(pdfBytes) }
+                }
+            }
+        }
+    )
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -67,11 +115,11 @@ fun SubjectsScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = {
-                        editingSubject = null
-                        showDialog = true
-                    }) {
+                    IconButton(onClick = { showDialog = true }) {
                         Icon(Icons.Default.Add, contentDescription = "Add Subject")
+                    }
+                    IconButton(onClick = { showExportDialog = true }) {
+                        Icon(Icons.Default.Download, contentDescription = "Export")
                     }
                 }
             )
@@ -202,6 +250,45 @@ fun SubjectsScreen(
                     }
                 )
             }
+
+            if (showExportDialog) {
+                AlertDialog(
+                    onDismissRequest = { showExportDialog = false },
+                    title = { Text("Export Attendance Report") },
+                    text = {
+                        Column {
+                            Text("Select file type:")
+                            exportTypes.forEach { type ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    RadioButton(
+                                        selected = selectedExportType == type,
+                                        onClick = { selectedExportType = type }
+                                    )
+                                    Text(type)
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        Button(onClick = {
+                            showExportDialog = false
+                            val fileName = "attendance_export_${LocalDate.now()}"
+                            when (selectedExportType) {
+                                "CSV" -> exportCsvLauncher.launch("$fileName.csv")
+                                "Excel" -> exportExcelLauncher.launch("$fileName.xlsx")
+                                "PDF" -> exportPdfLauncher.launch("$fileName.pdf")
+                            }
+                        }) {
+                            Text("Export")
+                        }
+                    },
+                    dismissButton = {
+                        OutlinedButton(onClick = { showExportDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
         }
     }
 }
@@ -311,4 +398,72 @@ fun SubjectCard(
             }
         }
     }
+}
+
+fun buildCsv(subjects: List<Subject>): String {
+    val header = "Subject,Type,Threshold,Attended,Total,Percentage\n"
+    val rows = subjects.joinToString("\n") {
+        val percentage = if (it.totalClasses > 0) (it.attendedClasses * 100.0 / it.totalClasses) else 0.0
+        "${it.name},${it.type},${it.threshold},${it.attendedClasses},${it.totalClasses},${"%.2f".format(percentage)}"
+    }
+    return header + rows
+}
+
+fun buildExcel(subjects: List<Subject>): ByteArray {
+    val workbook = XSSFWorkbook()
+    val sheet = workbook.createSheet("Attendance")
+    val header = listOf("Subject", "Type", "Threshold", "Attended", "Total", "Percentage")
+    val headerRow = sheet.createRow(0)
+    header.forEachIndexed { idx, title ->
+        val cell = headerRow.createCell(idx, CellType.STRING)
+        cell.setCellValue(title)
+    }
+    subjects.forEachIndexed { rowIdx, subject ->
+        val row = sheet.createRow(rowIdx + 1)
+        row.createCell(0, CellType.STRING).setCellValue(subject.name)
+        row.createCell(1, CellType.STRING).setCellValue(subject.type)
+        row.createCell(2, CellType.NUMERIC).setCellValue(subject.threshold.toDouble())
+        row.createCell(3, CellType.NUMERIC).setCellValue(subject.attendedClasses.toDouble())
+        row.createCell(4, CellType.NUMERIC).setCellValue(subject.totalClasses.toDouble())
+        val percentage = if (subject.totalClasses > 0) (subject.attendedClasses * 100.0 / subject.totalClasses) else 0.0
+        row.createCell(5, CellType.NUMERIC).setCellValue(percentage)
+    }
+    val out = java.io.ByteArrayOutputStream()
+    workbook.write(out)
+    workbook.close()
+    return out.toByteArray()
+}
+
+fun buildPdf(subjects: List<Subject>): ByteArray {
+    val pdfDocument = PdfDocument()
+    val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create() // A4 size
+    var pageNumber = 1
+    var y = 40f
+    var page = pdfDocument.startPage(pageInfo)
+    val canvas = page.canvas
+    val paint = Paint()
+    paint.textSize = 16f
+    val header = "Subject | Type | Threshold | Attended | Total | Percentage"
+    canvas.drawText(header, 40f, y, paint)
+    y += 30f
+    paint.textSize = 14f
+    subjects.forEach {
+        val percentage = if (it.totalClasses > 0) (it.attendedClasses * 100.0 / it.totalClasses) else 0.0
+        val line = "${it.name} | ${it.type} | ${it.threshold} | ${it.attendedClasses} | ${it.totalClasses} | ${"%.2f".format(percentage)}%"
+        if (y > 800f) {
+            pdfDocument.finishPage(page)
+            pageNumber++
+            page = pdfDocument.startPage(PdfDocument.PageInfo.Builder(595, 842, pageNumber).create())
+            y = 40f
+            page.canvas.drawText(header, 40f, y, paint)
+            y += 30f
+        }
+        page.canvas.drawText(line, 40f, y, paint)
+        y += 24f
+    }
+    pdfDocument.finishPage(page)
+    val out = java.io.ByteArrayOutputStream()
+    pdfDocument.writeTo(out)
+    pdfDocument.close()
+    return out.toByteArray()
 }

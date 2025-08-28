@@ -16,6 +16,23 @@ class AttendanceViewModel(val repository: AttendanceRepository) : ViewModel() {
     private val _attendancePercentage = MutableStateFlow(0.0)
     val attendancePercentage: StateFlow<Double> = _attendancePercentage
 
+    // Add StateFlow for attendance status per subject/date
+    private val _attendanceStatusMap = MutableStateFlow<Map<Pair<Int, String>, AttendanceStatus?>>(emptyMap())
+    fun getAttendanceStatusFlow(subjectId: Int?, date: String): StateFlow<AttendanceStatus?> {
+        val key = if (subjectId != null) Pair(subjectId, date) else null
+        return MutableStateFlow(_attendanceStatusMap.value[key] ?: null)
+    }
+
+    private fun updateAttendanceStatusFlow(subjectId: Int, date: String) {
+        viewModelScope.launch {
+            val status = getAttendanceStatusForSubjectOnDate(subjectId, date)
+            val key = Pair(subjectId, date)
+            _attendanceStatusMap.value = _attendanceStatusMap.value.toMutableMap().apply {
+                put(key, status)
+            }
+        }
+    }
+
     fun loadAttendance(subjectId: Int) {
         viewModelScope.launch {
             _attendanceHistory.value = repository.getAttendanceHistory(subjectId)
@@ -37,6 +54,7 @@ class AttendanceViewModel(val repository: AttendanceRepository) : ViewModel() {
                 repository.updateSubjectAttendance(subjectId, attended, total)
             }
             loadAttendance(subjectId)
+            updateAttendanceStatusFlow(subjectId, date)
         }
     }
 
@@ -69,6 +87,7 @@ class AttendanceViewModel(val repository: AttendanceRepository) : ViewModel() {
 
     suspend fun updateAttendanceStatusForSubjectOnDate(subjectId: Int, date: String, status: AttendanceStatus) {
         repository.updateAttendanceStatusForSubjectOnDate(subjectId, date, status)
+        updateAttendanceStatusFlow(subjectId, date)
     }
 
     suspend fun deleteAttendanceForSubjectOnDate(subjectId: Int, date: String) {
