@@ -33,6 +33,7 @@ import java.util.Locale
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
 import org.apache.poi.ss.usermodel.CellType
 import org.apache.poi.ss.usermodel.Row
+import java.time.LocalDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,7 +99,7 @@ fun SubjectsScreen(
         onResult = { uri: android.net.Uri? ->
             if (uri != null) {
                 coroutineScope.launch {
-                    val pdfBytes = buildPdf(filteredSubjects)
+                    val pdfBytes = buildPdf(context, filteredSubjects)
                     context.contentResolver.openOutputStream(uri)?.use { it.write(pdfBytes) }
                 }
             }
@@ -256,15 +257,32 @@ fun SubjectsScreen(
                     onDismissRequest = { showExportDialog = false },
                     title = { Text("Export Attendance Report") },
                     text = {
-                        Column {
+                        var expanded by remember { mutableStateOf(false) }
+                        Column(modifier = Modifier.fillMaxWidth()) {
                             Text("Select file type:")
-                            exportTypes.forEach { type ->
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    RadioButton(
-                                        selected = selectedExportType == type,
-                                        onClick = { selectedExportType = type }
-                                    )
-                                    Text(type)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Surface(
+                                tonalElevation = 2.dp,
+                                shape = MaterialTheme.shapes.medium,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceEvenly
+                                ) {
+                                    exportTypes.forEach { type ->
+                                        val isSelected = selectedExportType == type
+                                        Button(
+                                            onClick = { selectedExportType = type },
+                                            colors = if (isSelected)
+                                                ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                            else
+                                                ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface),
+                                            modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+                                        ) {
+                                            Text(type, color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -272,7 +290,7 @@ fun SubjectsScreen(
                     confirmButton = {
                         Button(onClick = {
                             showExportDialog = false
-                            val fileName = "attendance_export_${LocalDate.now()}"
+                            val fileName = "attendance_export_${LocalDateTime.now()}"
                             when (selectedExportType) {
                                 "CSV" -> exportCsvLauncher.launch("$fileName.csv")
                                 "Excel" -> exportExcelLauncher.launch("$fileName.xlsx")
@@ -434,32 +452,76 @@ fun buildExcel(subjects: List<Subject>): ByteArray {
     return out.toByteArray()
 }
 
-fun buildPdf(subjects: List<Subject>): ByteArray {
+fun buildPdf(context: android.content.Context, subjects: List<Subject>): ByteArray {
     val pdfDocument = PdfDocument()
     val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create() // A4 size
     var pageNumber = 1
-    var y = 40f
+    var y = 150f
     var page = pdfDocument.startPage(pageInfo)
     val canvas = page.canvas
     val paint = Paint()
+    paint.textSize = 18f
+    paint.isFakeBoldText = true
+
+    // Load the image from drawable resources
+    val bitmap = android.graphics.BitmapFactory.decodeResource(context.resources, com.example.attendance_tracker.R.drawable.ic_launcher_playstore)
+    if (bitmap != null) {
+        // Draw the image at the top left, scaled to 48x48 px
+        canvas.drawBitmap(bitmap, null, android.graphics.Rect(40, 40, 88, 88), null)
+        // Draw header text next to the image
+        canvas.drawText("Attendance Report", 100f, 70f, paint)
+    } else {
+        // Fallback: just draw the header text
+        canvas.drawText("Attendance Report", 40f, 70f, paint)
+    }
     paint.textSize = 16f
-    val header = "Subject | Type | Threshold | Attended | Total | Percentage"
-    canvas.drawText(header, 40f, y, paint)
-    y += 30f
+    paint.isFakeBoldText = false
+    val header = listOf("Subject", "Type", "Threshold", "Attended", "Total", "Percentage")
+    val colWidths = listOf(120, 80, 80, 80, 80, 100)
+    var x = 40f
+    // Draw table header
+    header.forEachIndexed { idx, title ->
+        canvas.drawText(title, x, y, paint)
+        x += colWidths[idx]
+    }
+    // Draw header line
+    canvas.drawLine(40f, y + 6f, 540f, y + 6f, paint)
+    y += 40f
     paint.textSize = 14f
     subjects.forEach {
+        x = 40f
         val percentage = if (it.totalClasses > 0) (it.attendedClasses * 100.0 / it.totalClasses) else 0.0
-        val line = "${it.name} | ${it.type} | ${it.threshold} | ${it.attendedClasses} | ${it.totalClasses} | ${"%.2f".format(percentage)}%"
+        val row = listOf(
+            it.name,
+            it.type,
+            it.threshold.toString(),
+            it.attendedClasses.toString(),
+            it.totalClasses.toString(),
+            "%.2f".format(percentage) + "%"
+        )
+        row.forEachIndexed { idx, cell ->
+            canvas.drawText(cell, x, y, paint)
+            x += colWidths[idx]
+        }
+        // Draw row line
+        canvas.drawLine(40f, y + 6f, 540f, y + 6f, paint)
+        y += 36f // Increased spacing between lines (was 24f)
         if (y > 800f) {
             pdfDocument.finishPage(page)
             pageNumber++
             page = pdfDocument.startPage(PdfDocument.PageInfo.Builder(595, 842, pageNumber).create())
-            y = 40f
-            page.canvas.drawText(header, 40f, y, paint)
+            y = 60f
+            page.canvas.drawText("Attendance Report", 40f, 40f, paint)
+            paint.textSize = 16f
+            x = 40f
+            header.forEachIndexed { idx, title ->
+                page.canvas.drawText(title, x, y, paint)
+                x += colWidths[idx]
+            }
+            page.canvas.drawLine(40f, y + 6f, 540f, y + 6f, paint)
             y += 30f
+            paint.textSize = 14f
         }
-        page.canvas.drawText(line, 40f, y, paint)
-        y += 24f
     }
     pdfDocument.finishPage(page)
     val out = java.io.ByteArrayOutputStream()
