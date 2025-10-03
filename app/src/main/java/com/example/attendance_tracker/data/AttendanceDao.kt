@@ -33,4 +33,7 @@ interface AttendanceDao {
 
     @Query("UPDATE attendance SET status = :status WHERE subjectId = :subjectId AND date = :date")
     suspend fun updateAttendanceStatusForSubjectOnDate(subjectId: Int, date: String, status: AttendanceStatus)
+
+    @Query("SELECT COUNT(*) FROM attendance WHERE date = :date")
+    suspend fun getAttendanceCountForDate(date: String): Int
 }

@@ -52,6 +52,7 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("io.github.vanpra.compose-material-dialogs:core:0.9.0")

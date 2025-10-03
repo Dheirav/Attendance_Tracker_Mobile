@@ -24,6 +24,12 @@ import com.example.attendance_tracker.repository.TimetableRepository
 import com.example.attendance_tracker.viewmodel.TimetableViewModel
 import com.example.attendance_tracker.viewmodel.TimetableViewModelFactory
 import androidx.compose.runtime.remember
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import com.example.attendance_tracker.worker.AttendanceReminderWorker
+import java.util.Calendar
+import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
@@ -92,6 +98,29 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
+
+                // Schedule Attendance Reminder Worker at 6 PM daily
+                val workManager = WorkManager.getInstance(applicationContext)
+                val now = Calendar.getInstance()
+                val sixPm = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 18)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+                var initialDelay = sixPm.timeInMillis - now.timeInMillis
+                if (initialDelay < 0) {
+                    // If 6 PM already passed today, schedule for tomorrow
+                    initialDelay += TimeUnit.DAYS.toMillis(1)
+                }
+                val attendanceReminderRequest = PeriodicWorkRequestBuilder<AttendanceReminderWorker>(1, TimeUnit.DAYS)
+                    .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+                    .build()
+                workManager.enqueueUniquePeriodicWork(
+                    "AttendanceReminderWork",
+                    ExistingPeriodicWorkPolicy.UPDATE,
+                    attendanceReminderRequest
+                )
             }
         }
     }

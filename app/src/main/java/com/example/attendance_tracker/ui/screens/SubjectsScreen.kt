@@ -16,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.foundation.background
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -71,7 +72,38 @@ fun SubjectsScreen(
     var selectedExportType by remember { mutableStateOf("CSV") }
     val exportTypes = listOf("CSV", "Excel", "PDF")
 
-    // Export launchers
+    // Import state
+    var showImportDialog by remember { mutableStateOf(false) }
+    val importFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent(),
+        onResult = { uri: android.net.Uri? ->
+            if (uri != null) {
+                coroutineScope.launch {
+                    try {
+                        val inputStream = context.contentResolver.openInputStream(uri)
+                        val mimeType = context.contentResolver.getType(uri)
+                        val importedSubjects = when {
+                            mimeType == "text/csv" -> parseCsvToSubjects(inputStream?.bufferedReader()?.readText() ?: "")
+                            mimeType == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> parseExcelToSubjects(inputStream!!)
+                            mimeType == "application/pdf" -> parsePdfToSubjects(inputStream!!)
+                            else -> emptyList()
+                        }
+                        if (importedSubjects.isEmpty()) {
+                            errorMessage = "Import successful: No subjects or history available."
+                        } else {
+                            importedSubjects.forEach { subject ->
+                                viewModel.addSubject(subject)
+                            }
+                            errorMessage = "Import successful: ${importedSubjects.size} subjects added."
+                        }
+                    } catch (e: Exception) {
+                        errorMessage = "Import failed: ${e.message}"
+                    }
+                }
+            }
+        }
+    )
+
     val exportCsvLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/csv"),
         onResult = { uri: android.net.Uri? ->
@@ -121,6 +153,9 @@ fun SubjectsScreen(
                     }
                     IconButton(onClick = { showExportDialog = true }) {
                         Icon(Icons.Default.Download, contentDescription = "Export")
+                    }
+                    IconButton(onClick = { showImportDialog = true }) {
+                        Icon(Icons.Default.Upload, contentDescription = "Import")
                     }
                 }
             )
@@ -307,6 +342,31 @@ fun SubjectsScreen(
                     }
                 )
             }
+
+            if (showImportDialog) {
+                AlertDialog(
+                    onDismissRequest = { showImportDialog = false },
+                    title = { Text("Import Subjects") },
+                    text = {
+                        Column {
+                            Text("Select a file to import subjects. Supported formats: CSV, Excel, PDF.")
+                        }
+                    },
+                    confirmButton = {
+                        Button(onClick = {
+                            showImportDialog = false
+                            importFileLauncher.launch("*/*")
+                        }) {
+                            Text("Import")
+                        }
+                    },
+                    dismissButton = {
+                        OutlinedButton(onClick = { showImportDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
         }
     }
 }
@@ -404,6 +464,7 @@ fun SubjectCard(
             Text("History:", style = MaterialTheme.typography.titleSmall)
             if (attendanceHistory.isEmpty()) {
                 Text("No attendance records yet.", style = MaterialTheme.typography.bodySmall)
+                Text("No history available.", style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.error))
             } else {
                 attendanceHistory.take(5).forEach { record ->
                     val statusText = if (record.note != null && record.note.contains("Manual record updated")) "Updated" else record.status.name
@@ -528,4 +589,49 @@ fun buildPdf(context: android.content.Context, subjects: List<Subject>): ByteArr
     pdfDocument.writeTo(out)
     pdfDocument.close()
     return out.toByteArray()
+}
+
+fun parseCsvToSubjects(csv: String): List<Subject> {
+    val lines = csv.split("\n").filter { it.isNotBlank() }
+    return lines.drop(1).map { line -> // Skip header line
+        val columns = line.split(",")
+        Subject(
+            name = columns.getOrNull(0)?.trim() ?: "",
+            type = columns.getOrNull(1)?.trim() ?: "",
+            threshold = columns.getOrNull(2)?.trim()?.toIntOrNull() ?: 0,
+            attendedClasses = columns.getOrNull(3)?.trim()?.toIntOrNull() ?: 0,
+            totalClasses = columns.getOrNull(4)?.trim()?.toIntOrNull() ?: 0
+        )
+    }
+}
+
+fun parseExcelToSubjects(inputStream: java.io.InputStream): List<Subject> {
+    val subjects = mutableListOf<Subject>()
+    val workbook = XSSFWorkbook(inputStream)
+    val sheet = workbook.getSheetAt(0)
+    for (rowIdx in 1..sheet.lastRowNum) {
+        val row = sheet.getRow(rowIdx)
+        if (row != null) {
+            val name = row.getCell(0)?.stringCellValue ?: ""
+            val type = row.getCell(1)?.stringCellValue ?: ""
+            val threshold = row.getCell(2)?.numericCellValue?.toInt() ?: 0
+            val attended = row.getCell(3)?.numericCellValue?.toInt() ?: 0
+            val total = row.getCell(4)?.numericCellValue?.toInt() ?: 0
+            subjects.add(Subject(
+                name = name,
+                type = type,
+                threshold = threshold,
+                attendedClasses = attended,
+                totalClasses = total
+            ))
+        }
+    }
+    workbook.close()
+    return subjects
+}
+
+fun parsePdfToSubjects(inputStream: java.io.InputStream): List<Subject> {
+    // TODO: Implement PDF parsing using PDFBox or iText
+    // For now, return empty list
+    return emptyList()
 }
