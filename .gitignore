@@ -1,15 +1,27 @@
 *.iml
-.gradle
+.gradle/
 /local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
+local.properties
+
+# Android Studio / IntelliJ — machine-local, not project config
+.idea/
+.kotlin/
+
+# Build output
 /build
+build/
 /captures
 .externalNativeBuild
 .cxx
-local.properties
+
+# Keystores and signing — never commit these
+*.jks
+*.keystore
+keystore.properties
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
